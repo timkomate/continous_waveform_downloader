@@ -1,3 +1,10 @@
 logs/
+*psfile/
+*input_files/
 *xml
 *token
+*.pyc
+*.text
+*.xy
+*.json
+*.sh
