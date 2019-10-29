@@ -8,3 +8,5 @@ logs/
 *.xy
 *.json
 *.sh
+/test
+*.mat
