@@ -35,7 +35,7 @@ class Downloader(object):
             print "Token is not accepted. Init %s without token" % (client)
             self._clients[client] = obspy.clients.fdsn.Client(client)
 
-    def start_download(self, dt, components, channels):
+    def start_download(self, dt, components, channels, max_gap, data_percentage, sleep_time, attempts):
         for index, row in self._df.iterrows():
             t = obspy.core.UTCDateTime(row["start_time"])
             t_end = obspy.core.UTCDateTime(row["end_time"])
@@ -50,9 +50,14 @@ class Downloader(object):
                         row = row,
                         t = t,
                         component = component,
-                        channels = channels
+                        channels = channels,
+                        dt = dt, 
+                        max_gap = max_gap, 
+                        data_percentage = data_percentage, 
+                        sleep_time = sleep_time, 
+                        attempts = attempts
                     )
-                    if (waveform != None and inventory != None):
+                    if (waveform is not None and inventory is not None):
                         waveform = self.process_waveform(waveform, inventory)
                         subpath = "%s/%s/%s/" % \
                             (component,t.year, t.datetime.strftime("%Y%m%d"))
@@ -116,19 +121,19 @@ class Downloader(object):
                 attempt += 1
         return None, None
     
-    def process_waveform(self, waveform, inventory):
+    def process_waveform(self, waveform, inventory, sampling_rate, bandpass_freqmin, bandpass_freqmax):
         start = timeit.default_timer()
         waveform.interpolate(
-            sampling_rate = 5,
+            sampling_rate = sampling_rate,
             method = "weighted_average_slopes"
         )
         waveform.filter(
             type = "bandpass",
-            freqmin = 0.005, 
-            freqmax = 1
+            freqmin = bandpass_freqmin, 
+            freqmax = bandpass_freqmax
         )
         waveform.detrend(
-            "linear"
+            type = "linear"
         )
         waveform.remove_response(
             inventory = inventory

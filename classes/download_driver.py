@@ -40,5 +40,9 @@ class Download_driver(object):
         dw.start_download(
             dt = self._config.getint("DOWNLOAD", "dt"),
             components = self._config.get("DOWNLOAD", "components").split(','),
-            channels = self._config.get("DOWNLOAD", "channels").split(',')
+            channels = self._config.get("DOWNLOAD", "channels").split(','),
+            max_gap = self._config.getfloat("DOWNLOAD", "max_gap"),
+            data_percentage = self._config.getfloat("DOWNLOAD", "data_percentage"), 
+            sleep_time = self._config.getint("DOWNLOAD", "sleep_time"), 
+            attempts = self._config.getint("DOWNLOAD", "attempts")
         )
