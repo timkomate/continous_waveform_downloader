@@ -1,27 +1,26 @@
 import multiprocessing
-from classes import downloader, metadata
+from classes import downloader, metadata, parameter_init
 
 class Download_driver(object):
-    def __init__(self, config, filenames):
-        self._config = config
+    def __init__(self, filenames):
         self._filenames = filenames
 
     def __call__(self, filename):
         self.go(filename)
 
     def make_metadata(self):
-        if (self._config.getboolean("METADATA", "download_metadata")):
+        if (parameter_init.download_metadata):
             print "Accessign metadata information..."
             metadata = metadata.Metadata(
-                lat = self._config.getfloat("METADATA", "latitude"),
-                lon = self._config.getfloat("METADATA", "longitude"),
-                max_radius = self._config.getfloat("METADATA", "max_radius"),
-                start_year = self._config.get("METADATA", "start_year"),
-                end_year = self._config.get("METADATA", "end_year"),
+                lat = parameter_init.latitude,
+                lon = parameter_init.longitude,
+                max_radius = parameter_init.max_radius,
+                start_year = parameter_init.start_year,
+                end_year = parameter_init.end_year,
             )
-            metadata.save_json(save_path = self._config.get("METADATA", "json_path"))
-            metadata.make_inputfile(save_path = self._config.get("METADATA", "station_list_path"))
-            metadata.extract_station_coordinates(save_path = self._config.get("METADATA", "coordinate_output"))
+            metadata.save_json(save_path = parameter_init.json_path)
+            metadata.make_inputfile(save_path = parameter_init.station_list_path)
+            metadata.extract_station_coordinates(save_path = parameter_init.coordinate_output)
             print "Metatada has been saved!"
 
     def start(self, core_number = multiprocessing.cpu_count()):
@@ -36,13 +35,13 @@ class Download_driver(object):
     def go(self, input_name):
         print input_name
         dw = downloader.Downloader(input_path = input_name)
-        dw.add_token(token = self._config.get("DOWNLOAD", "token_path"))
+        dw.add_token(token = parameter_init.token_path)
         dw.start_download(
-            dt = self._config.getint("DOWNLOAD", "dt"),
-            components = self._config.get("DOWNLOAD", "components").split(','),
-            channels = self._config.get("DOWNLOAD", "channels").split(','),
-            max_gap = self._config.getfloat("DOWNLOAD", "max_gap"),
-            data_percentage = self._config.getfloat("DOWNLOAD", "data_percentage"), 
-            sleep_time = self._config.getint("DOWNLOAD", "sleep_time"), 
-            attempts = self._config.getint("DOWNLOAD", "attempts")
+            dt = parameter_init.dt,
+            components = parameter_init.components,
+            channels = parameter_init.channels,
+            max_gap = parameter_init.max_gap,
+            data_percentage = parameter_init.data_percentage, 
+            sleep_time = parameter_init.sleep_time, 
+            attempts = parameter_init.attempts
         )

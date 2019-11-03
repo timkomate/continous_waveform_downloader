@@ -1,5 +1,5 @@
 from setup_logger import logger
-import processing
+import parameter_init
 import obspy
 import os
 from obspy.clients.fdsn import RoutingClient, Client
@@ -8,6 +8,7 @@ import sys
 import pandas as pd
 import time, timeit
 from scipy import io
+from quality_error import Quality_error
 
 class Downloader(object):
     def __init__(self, input_path):
@@ -15,9 +16,9 @@ class Downloader(object):
         self._df.columns = [ "client", "network", "station", "start_time", "end_time" ]
         self._clients = {}
         self._token = ""
-        self._processing = ""
-        self._response_flag = ""
-        self._processing_time = -1
+        self._processing = -1
+        self._name_ext = "VEL" if parameter_init.processing else "RAW"
+        self._name_ext += "tdn_" if parameter_init.timedomain_normalization else "_"
         self._error_code = 0
 
     def add_token(self, token):
@@ -43,47 +44,57 @@ class Downloader(object):
                 self.add_single_client(row["client"])
             for component in components:
                 while t <= t_end:
+                    subpath = "%s/%s/%s/" % (component,t.year, t.datetime.strftime("%Y%m%d"))
+                    filename = "%s.%s.%s_%s%s" % \
+                        (row["network"], row["station"], component, self._name_ext, t.datetime.strftime("%Y-%m-%d"))
                     start = timeit.default_timer()
                     self._error_code = 0
-                    
-                    waveform, inventory = self.get_waveform(
-                        row = row,
-                        t = t,
-                        component = component,
-                        channels = channels,
-                        dt = dt, 
-                        max_gap = max_gap, 
-                        data_percentage = data_percentage, 
-                        sleep_time = sleep_time, 
-                        attempts = attempts
-                    )
-                    if (waveform is not None and inventory is not None):
-                        waveform = self.process_waveform(waveform, inventory)
-                        subpath = "%s/%s/%s/" % \
-                            (component,t.year, t.datetime.strftime("%Y%m%d"))
-                        filename = "%s.%s.%s_%s_%s" % \
-                            (row["network"], row["station"], component, self._response_flag, t.datetime.strftime("%Y-%m-%d"))
-                        print subpath, filename
-                        self.save_waveform(
-                            savedir = "./test/",
-                            subdir = subpath,
-                            filename = filename, 
-                            waveform = waveform,
-                            inventory = inventory
+                    if (parameter_init.override or not os.path.exists("%s/%s/%s.mat" % (parameter_init.saving_directory, subpath, filename))):
+                        waveform, inventory = self.get_waveform(
+                            row = row,
+                            t = t,
+                            component = component,
+                            channels = channels,
+                            dt = dt, 
+                            max_gap = max_gap, 
+                            data_percentage = data_percentage, 
+                            sleep_time = sleep_time, 
+                            attempts = attempts
                         )
-                        logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._processing)
+                        if (waveform is not None and inventory is not None):
+                            waveform = self.process_waveform(
+                                waveform = waveform, 
+                                inventory = inventory,
+                                processing = parameter_init.processing,
+                                sampling_rate = parameter_init.sampling_freq, 
+                                detrend_option = parameter_init.detrend_option,
+                                bandpass_freqmin = parameter_init.bandpass_freqmin, 
+                                bandpass_freqmax = parameter_init.bandpass_freqmin
+                                )
+                            self.save_waveform(
+                                savedir = parameter_init.saving_directory,
+                                subdir = subpath,
+                                filename = filename, 
+                                waveform = waveform,
+                                inventory = inventory
+                            )
+                            logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._processing)
+                        else:
+                            logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
                     else:
+                        self._error_code = -4
                         logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
                     t += dt
+                    #sleep(3)
                     
     
-    def get_waveform(self, row, t, component, channels,
-        dt = 86400, max_gap = 3600, data_percentage = 0.75, sleep_time = 1, attempts = 1):
+    def get_waveform(self, row, t, component, channels, dt, max_gap, data_percentage, sleep_time, attempts):
         for channel in channels:
             con = "%sH%s" % (channel, component)
             attempt = 1
             while attempt <= attempts:
                 try:
+                #if True:
                     waveform = self._clients[row["client"]].get_waveforms(
                         network = row["network"], 
                         station = row["station"], 
@@ -93,6 +104,9 @@ class Downloader(object):
                         endtime = t + dt, 
                         attach_response = True
                     )
+                    if (not self.waveform_quality(waveform, max_gap, data_percentage, dt)):
+                        raise Quality_error([row["network"], row["station"], t])
+
                     waveform.merge(
                         method = 0,
                         fill_value = 0,
@@ -113,34 +127,65 @@ class Downloader(object):
                     return waveform, inventory
                 except obspy.clients.fdsn.header.FDSNNoDataException:
                     self._error_code = -1
+                except Quality_error:
+                    self._error_code = -5
                 except KeyboardInterrupt:
                     self._error_code = -3
-                    sys.exit()
                 except:
                     self._error_code = -2
                 attempt += 1
         return None, None
     
-    def process_waveform(self, waveform, inventory, sampling_rate, bandpass_freqmin, bandpass_freqmax):
+    def process_waveform(self, waveform, inventory, processing, sampling_rate, detrend_option, bandpass_freqmin, bandpass_freqmax):
         start = timeit.default_timer()
         waveform.interpolate(
             sampling_rate = sampling_rate,
             method = "weighted_average_slopes"
         )
-        waveform.filter(
-            type = "bandpass",
-            freqmin = bandpass_freqmin, 
-            freqmax = bandpass_freqmax
-        )
-        waveform.detrend(
-            type = "linear"
-        )
-        waveform.remove_response(
-            inventory = inventory
-        )
-        self._response_flag = "VEL"
+        if processing:
+            waveform.remove_response(
+                inventory = inventory
+            )
+
+            waveform.filter(
+                type = "bandpass",
+                freqmin = bandpass_freqmin, 
+                freqmax = bandpass_freqmax
+            )
+
+            waveform.detrend(
+                type = detrend_option
+            )
+            waveform.detrend(
+                type = "demean"
+            )
+        else:
+            waveform.remove_sensitivity()
+
         self._processing = timeit.default_timer() - start
         return waveform
+
+    @staticmethod
+    def get_num_samples(stream):
+        s = 0
+        for tr in stream:
+            s += tr.count()
+        return float(s)
+
+    @staticmethod
+    def get_max_gap(gap_list):
+        max_gap = 0
+        for i in gap_list:
+            if(i[-1] > max_gap):
+                max_gap = i[-1]
+        return max_gap
+
+    def waveform_quality(self, waveform, max_gap, data_percentage, dt):
+        s = Downloader.get_num_samples(waveform)
+        gap = Downloader.get_max_gap(waveform.get_gaps())
+        if (gap < waveform[0].stats.sampling_rate*max_gap and s / (waveform[0].stats.sampling_rate * dt) > data_percentage):
+            return True
+        return False
 
     def save_waveform(self, savedir, subdir, filename, waveform, inventory):
         directory = "%s/%s" % (savedir, subdir)
@@ -164,9 +209,7 @@ class Downloader(object):
             "channel": str(waveform.stats.channel)
         }
         save = "%s/%s" % (directory, filename)
+        print "save:", save
         io.savemat(save,waveform_dictionary)
 
 #TODO:
-#Add more options via the config file.
-#Do some additional quality checks.
-#Check if file already exists.
