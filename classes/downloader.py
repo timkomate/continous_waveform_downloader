@@ -2,6 +2,7 @@ from setup_logger import logger
 import parameter_init
 import obspy
 import os
+import numpy as np
 from obspy.clients.fdsn import RoutingClient, Client
 from obspy.clients.fdsn.client import FDSNException
 import sys
@@ -69,7 +70,7 @@ class Downloader(object):
                                 sampling_rate = parameter_init.sampling_freq, 
                                 detrend_option = parameter_init.detrend_option,
                                 bandpass_freqmin = parameter_init.bandpass_freqmin, 
-                                bandpass_freqmax = parameter_init.bandpass_freqmin
+                                bandpass_freqmax = parameter_init.bandpass_freqmax
                                 )
                             self.save_waveform(
                                 savedir = parameter_init.saving_directory,
@@ -107,12 +108,14 @@ class Downloader(object):
                     if (not self.waveform_quality(waveform, max_gap, data_percentage, dt)):
                         raise Quality_error([row["network"], row["station"], t])
 
-                    waveform.merge(
+                    """waveform.merge(
                         method = 0,
                         fill_value = 0,
                         interpolation_samples = 5
-                        )
+                        )"""
+                    waveform.merge(fill_value = "interpolate")
                     waveform = waveform.pop()
+                    #waveform.plot()
 
                     inventory = self._clients[row["client"]].get_stations(
                         network = row["network"], 
@@ -138,13 +141,14 @@ class Downloader(object):
     
     def process_waveform(self, waveform, inventory, processing, sampling_rate, detrend_option, bandpass_freqmin, bandpass_freqmax):
         start = timeit.default_timer()
-        waveform.interpolate(
-            sampling_rate = sampling_rate,
-            method = "weighted_average_slopes"
-        )
+        
         if processing:
-            waveform.remove_response(
-                inventory = inventory
+            waveform.detrend(
+                type = detrend_option
+            )
+
+            waveform.detrend(
+                type = "demean"
             )
 
             waveform.filter(
@@ -153,11 +157,12 @@ class Downloader(object):
                 freqmax = bandpass_freqmax
             )
 
-            waveform.detrend(
-                type = detrend_option
+            waveform.interpolate(
+                sampling_rate = sampling_rate,
+                method = "weighted_average_slopes"
             )
-            waveform.detrend(
-                type = "demean"
+            waveform.remove_response(
+                inventory = inventory
             )
         else:
             waveform.remove_sensitivity()
