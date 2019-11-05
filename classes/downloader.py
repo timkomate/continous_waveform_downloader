@@ -218,3 +218,4 @@ class Downloader(object):
         io.savemat(save,waveform_dictionary)
 
 #TODO:
+#timedomain normalization
