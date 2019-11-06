@@ -31,9 +31,26 @@ override = config.getboolean("DOWNLOAD", "override")
 
 #[PROCESSING]
 processing = config.getboolean("PROCESSING", "processing")
-timedomain_normalization = config.getboolean("PROCESSING", "timedomain_normalization")
-merge_option = config.get("DOWNLOAD", "merge_option")
-detrend_option = config.get("DOWNLOAD", "detrend_option")
-sampling_freq = config.getint("DOWNLOAD", "sampling_freq")
-bandpass_freqmin = config.getfloat("DOWNLOAD", "bandpass_freqmin")
-bandpass_freqmax = config.getfloat("DOWNLOAD", "bandpass_freqmax")
+merge_option = config.get("PROCESSING", "merge_option")
+detrend_option = config.get("PROCESSING", "detrend_option")
+sampling_freq = config.getint("PROCESSING", "sampling_freq")
+bandpass_freqmin = config.getfloat("PROCESSING", "bandpass_freqmin")
+bandpass_freqmax = config.getfloat("PROCESSING", "bandpass_freqmax")
+
+#[NORMALIZATION]
+timedomain_normalization = config.getboolean("NORMALIZATION", "timedomain_normalization")
+print timedomain_normalization
+filter_num = config.getint("NORMALIZATION", "filters")
+filters = []
+i = 1
+while i <= filter_num:
+    f = map(float, config.get("NORMALIZATION", "filter%s" % (i)).split(','))
+    filters.append(f)
+    i += 1
+
+envsmooth = config.getint("NORMALIZATION", "envsmooth")
+env_exp = config.getfloat("NORMALIZATION", "env_exp")
+min_weight = config.getfloat("NORMALIZATION", "min_weight")
+taper_length = config.getint("NORMALIZATION", "taper_length")
+plot = config.getboolean("NORMALIZATION", "plot")
+broadband_filter = map(float, config.get("NORMALIZATION", "broadband_filter").split(","))

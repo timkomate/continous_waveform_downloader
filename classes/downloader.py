@@ -10,6 +10,8 @@ import pandas as pd
 import time, timeit
 from scipy import io
 from quality_error import Quality_error
+from utilities import downweight_ends
+from scipy import signal, fftpack
 
 class Downloader(object):
     def __init__(self, input_path):
@@ -67,11 +69,19 @@ class Downloader(object):
                                 waveform = waveform, 
                                 inventory = inventory,
                                 processing = parameter_init.processing,
+                                normalization = parameter_init.timedomain_normalization,
                                 sampling_rate = parameter_init.sampling_freq, 
                                 detrend_option = parameter_init.detrend_option,
                                 bandpass_freqmin = parameter_init.bandpass_freqmin, 
-                                bandpass_freqmax = parameter_init.bandpass_freqmax
-                                )
+                                bandpass_freqmax = parameter_init.bandpass_freqmax,
+                                filters = parameter_init.filters,
+                                envsmooth = parameter_init.envsmooth, 
+                                env_exp = parameter_init.env_exp, 
+                                min_weight = parameter_init.min_weight, 
+                                taper_length = parameter_init.taper_length, 
+                                plot = parameter_init.plot, 
+                                broadband_filter = parameter_init.broadband_filter
+                            )
                             self.save_waveform(
                                 savedir = parameter_init.saving_directory,
                                 subdir = subpath,
@@ -139,7 +149,8 @@ class Downloader(object):
                 attempt += 1
         return None, None
     
-    def process_waveform(self, waveform, inventory, processing, sampling_rate, detrend_option, bandpass_freqmin, bandpass_freqmax):
+    def process_waveform(self, waveform, inventory, processing, normalization, sampling_rate, detrend_option, bandpass_freqmin, bandpass_freqmax,
+        filters = [[30,1]],envsmooth = 1500, env_exp = 1.5, min_weight = 0.1, taper_length = 1000, plot = False, broadband_filter = [200,1]):
         start = timeit.default_timer()
         
         if processing:
@@ -164,6 +175,18 @@ class Downloader(object):
             waveform.remove_response(
                 inventory = inventory
             )
+            if (normalization):
+                print "time domain normalization..."
+                waveform.data = self.running_absolute_mean(
+                    waveform = waveform,
+                    filters = filters,
+                    envsmooth = envsmooth, 
+                    env_exp = env_exp,
+                    min_weight = min_weight, 
+                    taper_length = taper_length, 
+                    plot = plot,
+                    broadband_filter = broadband_filter
+                )
         else:
             waveform.remove_sensitivity()
 
@@ -191,6 +214,64 @@ class Downloader(object):
         if (gap < waveform[0].stats.sampling_rate*max_gap and s / (waveform[0].stats.sampling_rate * dt) > data_percentage):
             return True
         return False
+
+    def running_absolute_mean(self, waveform, filters, envsmooth = 1500, env_exp = 1.5, 
+                        min_weight = 0.1, taper_length = 1000, plot = False,
+                        broadband_filter = [200,1]):
+        data = (signal.detrend(waveform.data, type="linear" )) / np.power(10,9)
+        nb = np.floor(envsmooth/waveform.stats.delta)
+        weight = np.ones((data.shape[0]))
+        boxc = np.ones((int(nb)))/nb
+        nyf = (1./2)*waveform.stats.sampling_rate
+        if (plot):
+            plt.plot(data)
+            plt.title("unfiltered data")
+            plt.show()
+        [b,a] = signal.butter(
+            N = 3,
+            Wn = [1./broadband_filter[0]/nyf, 1./broadband_filter[1]/nyf], 
+            btype='bandpass'
+        )
+        data = signal.filtfilt(
+            b = b,
+            a = a,
+            x = data)
+        for filter in filters:
+            print filter
+            [b,a] = signal.butter(3,[1./filter[0]/nyf, 1./filter[1]/nyf], btype='bandpass')
+            filtered_data = downweight_ends(signal.filtfilt(b,a,data), wlength = taper_length * waveform.stats.sampling_rate)
+            if (plot):
+                plt.plot(filtered_data)
+                plt.title("filtered data")
+                plt.show()
+            data_env = signal.convolve(abs(filtered_data),boxc,method="fft")
+            data_env = data_env[boxc.shape[0]/ 2 -1: -boxc.shape[0]/ 2]
+            if (plot):
+                plt.plot(data_env)
+                plt.title("envelope")
+                plt.show()
+            #print data_env.shape, self._data.shape
+            data_exponent = np.power(data_env, env_exp)
+            weight = weight * data_exponent / np.mean(data_exponent)
+            if (plot):
+                plt.plot(weight)
+                plt.title("weights")
+                plt.show()
+        water_level = np.mean(weight) * min_weight
+        weight[weight < water_level] = water_level
+        nb = 2*int(taper_length*waveform.stats.sampling_rate)
+        weight[:nb] = np.mean(weight)
+        weight[-nb:] = np.mean(weight)
+        if (plot):
+            plt.plot(weight)
+            plt.title("final weights")
+            plt.show()
+        data = downweight_ends((data / weight),wlength = taper_length * waveform.stats.sampling_rate) 
+        if (plot):
+            plt.plot(data)
+            plt.title("filtered data")
+            plt.show()
+        return data
 
     def save_waveform(self, savedir, subdir, filename, waveform, inventory):
         directory = "%s/%s" % (savedir, subdir)
