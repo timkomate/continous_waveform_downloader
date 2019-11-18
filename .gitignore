@@ -4,7 +4,7 @@ logs/
 *xml
 *token
 *.pyc
-*.text
+*.text*
 *.xy
 *.json
 *.sh
