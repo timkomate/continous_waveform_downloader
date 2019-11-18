@@ -83,14 +83,18 @@ class Downloader(object):
                                 plot = parameter_init.plot, 
                                 broadband_filter = parameter_init.broadband_filter
                             )
-                            self.save_waveform(
-                                savedir = parameter_init.saving_directory,
-                                subdir = subpath,
-                                filename = filename, 
-                                waveform = waveform,
-                                inventory = inventory
-                            )
-                            logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._processing)
+                            if (waveform in not None):
+                                self.save_waveform(
+                                    savedir = parameter_init.saving_directory,
+                                    subdir = subpath,
+                                    filename = filename, 
+                                    waveform = waveform,
+                                    inventory = inventory
+                                )
+                                logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._processing)
+                            else:
+                                self._error_code = -6
+                                logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
                         else:
                             logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
                     else:
@@ -119,11 +123,6 @@ class Downloader(object):
                     if (not self.waveform_quality(waveform, max_gap, data_percentage, dt)):
                         raise Quality_error([row["network"], row["station"], t])
 
-                    """waveform.merge(
-                        method = 0,
-                        fill_value = 0,
-                        interpolation_samples = 5
-                        )"""
                     waveform.merge(fill_value = "interpolate")
                     waveform = waveform.pop()
                     #waveform.plot()
@@ -153,46 +152,49 @@ class Downloader(object):
     def process_waveform(self, waveform, inventory, processing, normalization, sampling_rate, detrend_option, bandpass_freqmin, bandpass_freqmax,
         filters = [[30,1]],envsmooth = 1500, env_exp = 1.5, min_weight = 0.1, taper_length = 1000, plot = False, broadband_filter = [200,1]):
         start = timeit.default_timer()
-        
-        if processing:
-            waveform.detrend(
-                type = detrend_option
-            )
-
-            waveform.detrend(
-                type = "demean"
-            )
-
-            waveform.filter(
-                type = "bandpass",
-                freqmin = bandpass_freqmin, 
-                freqmax = bandpass_freqmax
-            )
-
-            waveform.interpolate(
-                sampling_rate = sampling_rate,
-                method = "weighted_average_slopes"
-            )
-            waveform.remove_response(
-                inventory = inventory
-            )
-            if (normalization):
-                print "time domain normalization..."
-                waveform.data = self.running_absolute_mean(
-                    waveform = waveform,
-                    filters = filters,
-                    envsmooth = envsmooth, 
-                    env_exp = env_exp,
-                    min_weight = min_weight, 
-                    taper_length = taper_length, 
-                    plot = plot,
-                    broadband_filter = broadband_filter
+        try:
+            if processing:
+                waveform.detrend(
+                    type = detrend_option
                 )
-        else:
-            waveform.remove_sensitivity()
 
-        self._processing = timeit.default_timer() - start
-        return waveform
+                waveform.detrend(
+                    type = "demean"
+                )
+
+                waveform.filter(
+                    type = "bandpass",
+                    freqmin = bandpass_freqmin, 
+                    freqmax = bandpass_freqmax
+                )
+
+                waveform.interpolate(
+                    sampling_rate = sampling_rate,
+                    method = "weighted_average_slopes"
+                )
+                waveform.remove_response(
+                    inventory = inventory
+                )
+                if (normalization):
+                    print "time domain normalization..."
+                    waveform.data = self.running_absolute_mean(
+                        waveform = waveform,
+                        filters = filters,
+                        envsmooth = envsmooth, 
+                        env_exp = env_exp,
+                        min_weight = min_weight, 
+                        taper_length = taper_length, 
+                        plot = plot,
+                        broadband_filter = broadband_filter
+                    )
+            else:
+                waveform.remove_sensitivity()
+
+            self._processing = timeit.default_timer() - start
+            return waveform
+        except:
+            self._processing = timeit.default_timer() - start
+            return None
 
     @staticmethod
     def get_num_samples(stream):
@@ -300,4 +302,4 @@ class Downloader(object):
         io.savemat(save,waveform_dictionary)
 
 #TODO:
-#timedomain normalization
+#
