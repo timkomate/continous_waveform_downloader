@@ -83,7 +83,7 @@ class Downloader(object):
                                 plot = parameter_init.plot, 
                                 broadband_filter = parameter_init.broadband_filter
                             )
-                            if (waveform in not None):
+                            if (waveform is not None):
                                 self.save_waveform(
                                     savedir = parameter_init.saving_directory,
                                     subdir = subpath,
