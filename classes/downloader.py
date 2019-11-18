@@ -50,6 +50,7 @@ class Downloader(object):
                     subpath = "%s/%s/%s/" % (component,t.year, t.datetime.strftime("%Y%m%d"))
                     filename = "%s.%s.%s_%s%s" % \
                         (row["network"], row["station"], component, self._name_ext, t.datetime.strftime("%Y-%m-%d"))
+                    print filename
                     start = timeit.default_timer()
                     self._error_code = 0
                     if (parameter_init.override or not os.path.exists("%s/%s/%s.mat" % (parameter_init.saving_directory, subpath, filename))):

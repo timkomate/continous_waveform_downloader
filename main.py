@@ -25,5 +25,6 @@ if __name__ == "__main__":
     input_path = parameter_init.station_input_path
     input_list = [f for f in glob.glob("%s/*.text*" % (input_path))]
     input_list = sorted(input_list)
+    print input_list
     dw_d = download_driver.Download_driver(input_list)
     dw_d.start(core_number = parameter_init.number_of_cpus)

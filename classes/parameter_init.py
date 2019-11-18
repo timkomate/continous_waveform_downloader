@@ -31,7 +31,7 @@ override = config.getboolean("DOWNLOAD", "override")
 
 #[PROCESSING]
 processing = config.getboolean("PROCESSING", "processing")
-merge_option = config.get("PROCESSING", "merge_option")
+#merge_option = config.get("PROCESSING", "merge_option")
 detrend_option = config.get("PROCESSING", "detrend_option")
 sampling_freq = config.getint("PROCESSING", "sampling_freq")
 bandpass_freqmin = config.getfloat("PROCESSING", "bandpass_freqmin")
