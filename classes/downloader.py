@@ -38,6 +38,9 @@ class Downloader(object):
         except obspy.clients.fdsn.client.FDSNException:
             print "Token is not accepted. Init %s without token" % (client)
             self._clients[client] = obspy.clients.fdsn.Client(client)
+	except ValueError:
+            print "Token does not exist. Init %s without token" % (client)
+	    self._clients[client] = obspy.clients.fdsn.Client(client)
 
     def start_download(self, dt, components, channels, max_gap, data_percentage, sleep_time, attempts):
         for index, row in self._df.iterrows():
