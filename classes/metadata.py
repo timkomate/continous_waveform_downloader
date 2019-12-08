@@ -12,8 +12,9 @@ class Metadata(object):
         self._output_text = []
         self._start_year = obspy.core.UTCDateTime(start_year)
         self._end_year = obspy.core.UTCDateTime(end_year)
+        print "Generating metadata..."
         for node in EIDA_nodes:
-            print node
+            #print node
             client = obspy.clients.fdsn.Client(node)
             inv = client.get_stations(
                 network = network,

@@ -40,6 +40,7 @@ bandpass_freqmax = config.getfloat("PROCESSING", "bandpass_freqmax")
 
 #[NORMALIZATION]
 timedomain_normalization = config.getboolean("NORMALIZATION", "timedomain_normalization")
+apply_broadband_filter = config.getboolean("NORMALIZATION", "apply_broadband_filter")
 filter_num = config.getint("NORMALIZATION", "filters")
 filters = []
 i = 1
