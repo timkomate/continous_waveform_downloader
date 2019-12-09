@@ -44,11 +44,11 @@ class Downloader(object):
 
     def start_download(self, dt, components, channels, max_gap, data_percentage, sleep_time, attempts):
         for index, row in self._df.iterrows():
-            t = obspy.core.UTCDateTime(row["start_time"])
-            t_end = obspy.core.UTCDateTime(row["end_time"])
             if(row["client"] not in self._clients):
                 self.add_single_client(row["client"])
             for component in components:
+                t = obspy.core.UTCDateTime(row["start_time"])
+                t_end = obspy.core.UTCDateTime(row["end_time"])
                 while t <= t_end:
                     subpath = "%s/%s/%s/" % (component,t.year, t.datetime.strftime("%Y%m%d"))
                     filename = "%s.%s.%s_%s%s" % \

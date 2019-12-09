@@ -9,7 +9,7 @@ if __name__ == "__main__":
     config.read("./config.cfg")
 
     print "obspy version:",obspy.core.util.version.read_release_version()
-    
+
     if (parameter_init.download_metadata):
         metadata = metadata.Metadata(
             lat = parameter_init.latitude,
