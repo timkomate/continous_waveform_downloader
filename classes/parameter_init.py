@@ -15,6 +15,7 @@ station_list_path = config.get("METADATA", "station_list_path")
 coordinate_output = config.get("METADATA", "coordinate_output")
 
 #[DOWNLOAD]
+perform_download = config.getboolean("DOWNLOAD", "perform_download")
 token_path = config.get("DOWNLOAD", "token_path")
 station_input_path = config.get("DOWNLOAD", "station_list_path")
 number_of_cpus = config.getint("DOWNLOAD", "number_of_cpus")
@@ -31,7 +32,7 @@ override = config.getboolean("DOWNLOAD", "override")
 
 #[PROCESSING]
 processing = config.getboolean("PROCESSING", "processing")
-#merge_option = config.get("PROCESSING", "merge_option")
+resample = config.getboolean("PROCESSING", "resample")
 detrend_option = config.get("PROCESSING", "detrend_option")
 sampling_freq = config.getint("PROCESSING", "sampling_freq")
 bandpass_freqmin = config.getfloat("PROCESSING", "bandpass_freqmin")
@@ -39,7 +40,7 @@ bandpass_freqmax = config.getfloat("PROCESSING", "bandpass_freqmax")
 
 #[NORMALIZATION]
 timedomain_normalization = config.getboolean("NORMALIZATION", "timedomain_normalization")
-print timedomain_normalization
+apply_broadband_filter = config.getboolean("NORMALIZATION", "apply_broadband_filter")
 filter_num = config.getint("NORMALIZATION", "filters")
 filters = []
 i = 1

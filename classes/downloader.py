@@ -32,7 +32,7 @@ class Downloader(object):
             self.add_single_client(client)
 
     def add_single_client(self, client):
-        print client
+        #print client
         try:
             self._clients[client] = obspy.clients.fdsn.Client(client, eida_token = self._token)
         except obspy.clients.fdsn.client.FDSNException:
@@ -40,20 +40,20 @@ class Downloader(object):
             self._clients[client] = obspy.clients.fdsn.Client(client)
 	except ValueError:
             print "Token does not exist. Init %s without token" % (client)
-	    self._clients[client] = obspy.clients.fdsn.Client(client)
+            self._clients[client] = obspy.clients.fdsn.Client(client)
 
     def start_download(self, dt, components, channels, max_gap, data_percentage, sleep_time, attempts):
         for index, row in self._df.iterrows():
+            t_end = obspy.core.UTCDateTime(row["end_time"])
             if(row["client"] not in self._clients):
                 self.add_single_client(row["client"])
             for component in components:
                 t = obspy.core.UTCDateTime(row["start_time"])
-                t_end = obspy.core.UTCDateTime(row["end_time"])
                 while t <= t_end:
                     subpath = "%s/%s/%s/" % (component,t.year, t.datetime.strftime("%Y%m%d"))
                     filename = "%s.%s.%s_%s%s" % \
                         (row["network"], row["station"], component, self._name_ext, t.datetime.strftime("%Y-%m-%d"))
-                    print filename
+                    #print filename
                     start = timeit.default_timer()
                     self._error_code = 0
                     if (parameter_init.override or not os.path.exists("%s/%s/%s.mat" % (parameter_init.saving_directory, subpath, filename))):
@@ -74,6 +74,7 @@ class Downloader(object):
                                 inventory = inventory,
                                 processing = parameter_init.processing,
                                 normalization = parameter_init.timedomain_normalization,
+                                resample = parameter_init.resample,
                                 sampling_rate = parameter_init.sampling_freq, 
                                 detrend_option = parameter_init.detrend_option,
                                 bandpass_freqmin = parameter_init.bandpass_freqmin, 
@@ -84,6 +85,7 @@ class Downloader(object):
                                 min_weight = parameter_init.min_weight, 
                                 taper_length = parameter_init.taper_length, 
                                 plot = parameter_init.plot, 
+                                apply_broadband_filter = parameter_init.apply_broadband_filter,
                                 broadband_filter = parameter_init.broadband_filter
                             )
                             if (waveform is not None):
@@ -104,7 +106,6 @@ class Downloader(object):
                         self._error_code = -4
                         logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
                     t += dt
-                    #sleep(3)
                     
     
     def get_waveform(self, row, t, component, channels, dt, max_gap, data_percentage, sleep_time, attempts):
@@ -152,8 +153,9 @@ class Downloader(object):
                 attempt += 1
         return None, None
     
-    def process_waveform(self, waveform, inventory, processing, normalization, sampling_rate, detrend_option, bandpass_freqmin, bandpass_freqmax,
-        filters = [[30,1]],envsmooth = 1500, env_exp = 1.5, min_weight = 0.1, taper_length = 1000, plot = False, broadband_filter = [200,1]):
+    def process_waveform(self, waveform, inventory, processing, normalization, resample, sampling_rate, detrend_option, 
+        bandpass_freqmin, bandpass_freqmax, filters = [[30,1]],envsmooth = 1500, env_exp = 1.5, min_weight = 0.1, taper_length = 1000, 
+        plot = False, apply_broadband_filter = False, broadband_filter = [200,1]):
         start = timeit.default_timer()
         try:
             if processing:
@@ -165,21 +167,28 @@ class Downloader(object):
                     type = "demean"
                 )
 
-                waveform.filter(
-                    type = "bandpass",
-                    freqmin = bandpass_freqmin, 
-                    freqmax = bandpass_freqmax
+                waveform.taper(
+                    type = "cosine",
+                    max_percentage = 0.05
                 )
+                
+               # waveform.filter(
+               #     type = "bandpass",
+               #     freqmin = bandpass_freqmin, 
+               #     freqmax = bandpass_freqmax
+               # )
+                if (resample):
+                    waveform.interpolate(
+                        sampling_rate = sampling_rate,
+                        method = "weighted_average_slopes"
+                    )
 
-                waveform.interpolate(
-                    sampling_rate = sampling_rate,
-                    method = "weighted_average_slopes"
-                )
                 waveform.remove_response(
                     inventory = inventory
                 )
+
                 if (normalization):
-                    print "time domain normalization..."
+                    #print "time domain normalization..."
                     waveform.data = self.running_absolute_mean(
                         waveform = waveform,
                         filters = filters,
@@ -188,6 +197,7 @@ class Downloader(object):
                         min_weight = min_weight, 
                         taper_length = taper_length, 
                         plot = plot,
+                        apply_broadband_filter = apply_broadband_filter,
                         broadband_filter = broadband_filter
                     )
             else:
@@ -223,7 +233,7 @@ class Downloader(object):
 
     def running_absolute_mean(self, waveform, filters, envsmooth = 1500, env_exp = 1.5, 
                         min_weight = 0.1, taper_length = 1000, plot = False,
-                        broadband_filter = [200,1]):
+                        apply_broadband_filter = True, broadband_filter = [200,1]):
         data = (signal.detrend(waveform.data, type="linear" )) / np.power(10,9)
         nb = np.floor(envsmooth/waveform.stats.delta)
         weight = np.ones((data.shape[0]))
@@ -233,17 +243,18 @@ class Downloader(object):
             plt.plot(data)
             plt.title("unfiltered data")
             plt.show()
-        [b,a] = signal.butter(
-            N = 3,
-            Wn = [1./broadband_filter[0]/nyf, 1./broadband_filter[1]/nyf], 
-            btype='bandpass'
-        )
-        data = signal.filtfilt(
-            b = b,
-            a = a,
-            x = data)
+        if (apply_broadband_filter):
+            [b,a] = signal.butter(
+                N = 3,
+                Wn = [1./broadband_filter[0]/nyf, 1./broadband_filter[1]/nyf], 
+                btype='bandpass'
+            )
+            data = signal.filtfilt(
+                b = b,
+                a = a,
+                x = data)
         for filter in filters:
-            print filter
+            #print filter
             [b,a] = signal.butter(3,[1./filter[0]/nyf, 1./filter[1]/nyf], btype='bandpass')
             filtered_data = downweight_ends(signal.filtfilt(b,a,data), wlength = taper_length * waveform.stats.sampling_rate)
             if (plot):
