@@ -92,7 +92,7 @@ class Downloader(object):
                                 broadband_filter = parameter_init.broadband_filter
                             )
                             if (waveform is not None):
-                                if (not (-np.isfinite(waveform.data)).any()):
+                                if (not (~np.isfinite(waveform.data)).any()):
                                     self.save_waveform(
                                         savedir = parameter_init.saving_directory,
                                         subdir = subpath,

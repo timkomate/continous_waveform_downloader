@@ -1,3 +1,4 @@
 class Quality_error(Exception):
     def __init__(self, value):
-        print value
+        #print value
+        pass
