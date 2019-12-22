@@ -299,7 +299,11 @@ class Downloader(object):
             plt.plot(weight)
             plt.title("final weights")
             plt.show()
-        data = downweight_ends((data / weight),wlength = taper_length * waveform.stats.sampling_rate) 
+        data = downweight_ends(
+            (data / weight),
+            wlength = taper_length * waveform.stats.sampling_rate
+        )
+
         if (plot):
             plt.plot(data)
             plt.title("filtered data")
