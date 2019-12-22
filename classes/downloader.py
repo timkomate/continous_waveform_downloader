@@ -19,10 +19,12 @@ class Downloader(object):
         self._df.columns = [ "client", "network", "station", "start_time", "end_time" ]
         self._clients = {}
         self._token = ""
-        self._processing = -1
+        self._processing = ""
+        self._processing_time = -1
         self._name_ext = "VEL" if parameter_init.processing else "RAW"
         self._name_ext += "tdn_" if parameter_init.timedomain_normalization else "_"
         self._error_code = 0
+
 
     def add_token(self, token):
         self._token = token
@@ -32,18 +34,18 @@ class Downloader(object):
             self.add_single_client(client)
 
     def add_single_client(self, client):
-        #print client
         try:
             self._clients[client] = obspy.clients.fdsn.Client(client, eida_token = self._token)
         except obspy.clients.fdsn.client.FDSNException:
             print "Token is not accepted. Init %s without token" % (client)
             self._clients[client] = obspy.clients.fdsn.Client(client)
-	except ValueError:
+        except ValueError:
             print "Token does not exist. Init %s without token" % (client)
             self._clients[client] = obspy.clients.fdsn.Client(client)
 
     def start_download(self, dt, components, channels, max_gap, data_percentage, sleep_time, attempts):
         for index, row in self._df.iterrows():
+            print "{}.{}".format(row["network"],row["station"])
             t_end = obspy.core.UTCDateTime(row["end_time"])
             if(row["client"] not in self._clients):
                 self.add_single_client(row["client"])
@@ -53,7 +55,6 @@ class Downloader(object):
                     subpath = "%s/%s/%s/" % (component,t.year, t.datetime.strftime("%Y%m%d"))
                     filename = "%s.%s.%s_%s%s" % \
                         (row["network"], row["station"], component, self._name_ext, t.datetime.strftime("%Y-%m-%d"))
-                    #print filename
                     start = timeit.default_timer()
                     self._error_code = 0
                     if (parameter_init.override or not os.path.exists("%s/%s/%s.mat" % (parameter_init.saving_directory, subpath, filename))):
@@ -79,6 +80,8 @@ class Downloader(object):
                                 detrend_option = parameter_init.detrend_option,
                                 bandpass_freqmin = parameter_init.bandpass_freqmin, 
                                 bandpass_freqmax = parameter_init.bandpass_freqmax,
+                                filter_order = parameter_init.filter_order,
+                                zero_phase = parameter_init.zero_phase,
                                 filters = parameter_init.filters,
                                 envsmooth = parameter_init.envsmooth, 
                                 env_exp = parameter_init.env_exp, 
@@ -89,14 +92,18 @@ class Downloader(object):
                                 broadband_filter = parameter_init.broadband_filter
                             )
                             if (waveform is not None):
-                                self.save_waveform(
-                                    savedir = parameter_init.saving_directory,
-                                    subdir = subpath,
-                                    filename = filename, 
-                                    waveform = waveform,
-                                    inventory = inventory
-                                )
-                                logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._processing)
+                                if (not (-np.isfinite(waveform.data)).any()):
+                                    self.save_waveform(
+                                        savedir = parameter_init.saving_directory,
+                                        subdir = subpath,
+                                        filename = filename, 
+                                        waveform = waveform,
+                                        inventory = inventory
+                                    )
+                                    logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._processing_time)
+                                else:
+                                    self._error_code = -7
+                                    logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
                             else:
                                 self._error_code = -6
                                 logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
@@ -105,8 +112,7 @@ class Downloader(object):
                     else:
                         self._error_code = -4
                         logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
-                    t += dt
-                    
+                    t += dt               
     
     def get_waveform(self, row, t, component, channels, dt, max_gap, data_percentage, sleep_time, attempts):
         for channel in channels:
@@ -114,7 +120,6 @@ class Downloader(object):
             attempt = 1
             while attempt <= attempts:
                 try:
-                #if True:
                     waveform = self._clients[row["client"]].get_waveforms(
                         network = row["network"], 
                         station = row["station"], 
@@ -122,14 +127,13 @@ class Downloader(object):
                         channel = con, 
                         starttime = t, 
                         endtime = t + dt, 
-                        attach_response = True
+                        attach_response = False
                     )
                     if (not self.waveform_quality(waveform, max_gap, data_percentage, dt)):
                         raise Quality_error([row["network"], row["station"], t])
 
                     waveform.merge(fill_value = "interpolate")
                     waveform = waveform.pop()
-                    #waveform.plot()
 
                     inventory = self._clients[row["client"]].get_stations(
                         network = row["network"], 
@@ -154,40 +158,50 @@ class Downloader(object):
         return None, None
     
     def process_waveform(self, waveform, inventory, processing, normalization, resample, sampling_rate, detrend_option, 
-        bandpass_freqmin, bandpass_freqmax, filters = [[30,1]],envsmooth = 1500, env_exp = 1.5, min_weight = 0.1, taper_length = 1000, 
-        plot = False, apply_broadband_filter = False, broadband_filter = [200,1]):
+        bandpass_freqmin, bandpass_freqmax, filter_order = 4, zero_phase = False, filters = [[30,1]],envsmooth = 1500, 
+        env_exp = 1.5, min_weight = 0.1, taper_length = 1000,plot = False, apply_broadband_filter = False, 
+        broadband_filter = [200,1]):
         start = timeit.default_timer()
         try:
+        #if (True):
             if processing:
+                self._processing += "Detrend -> "
                 waveform.detrend(
                     type = detrend_option
                 )
-
+                self._processing += "Demean -> "
                 waveform.detrend(
                     type = "demean"
                 )
-
+                self._processing += "Cosine type taper: 0.05 % ->"
                 waveform.taper(
                     type = "cosine",
                     max_percentage = 0.05
                 )
                 
+                self._processing += "bandpass filter between: {} {} Hz. Filter-order: {}, zerophase: {} -> ".format(
+                    bandpass_freqmin, bandpass_freqmax, filter_order, zero_phase
+                )
                 waveform.filter(
                     type = "bandpass",
                     freqmin = bandpass_freqmin, 
-                    freqmax = bandpass_freqmax
+                    freqmax = bandpass_freqmax,
+                    corners = filter_order,
+                    zerophase = zero_phase
                 )
                 if (resample):
+                    self._processing += "resample to: {} Hz -> ".format(sampling_rate)
                     waveform.interpolate(
                         sampling_rate = sampling_rate,
                         method = "weighted_average_slopes"
                     )
-
+                self._processing += "remove response -> "
                 waveform.remove_response(
                     inventory = inventory
                 )
 
                 if (normalization):
+                    self._processing += "running absolute mean normalization -> "
                     #print "time domain normalization..."
                     waveform.data = self.running_absolute_mean(
                         waveform = waveform,
@@ -201,12 +215,14 @@ class Downloader(object):
                         broadband_filter = broadband_filter
                     )
             else:
+                self._processing += "remove sensitivity ->"
                 waveform.remove_sensitivity()
 
-            self._processing = timeit.default_timer() - start
+            self._processing_time = timeit.default_timer() - start
+            self._processing += "processing time: {} sec".format(self._processing_time)
             return waveform
         except:
-            self._processing = timeit.default_timer() - start
+            self._processing_time = timeit.default_timer() - start
             return None
 
     @staticmethod

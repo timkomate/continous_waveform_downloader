@@ -12,3 +12,4 @@ logs/
 *.mat
 input*/
 gmt*
+*test*

@@ -37,6 +37,8 @@ detrend_option = config.get("PROCESSING", "detrend_option")
 sampling_freq = config.getint("PROCESSING", "sampling_freq")
 bandpass_freqmin = config.getfloat("PROCESSING", "bandpass_freqmin")
 bandpass_freqmax = config.getfloat("PROCESSING", "bandpass_freqmax")
+filter_order = config.getint("PROCESSING", "filter_order")
+zero_phase = config.getboolean("PROCESSING", "zero_phase")
 
 #[NORMALIZATION]
 timedomain_normalization = config.getboolean("NORMALIZATION", "timedomain_normalization")
