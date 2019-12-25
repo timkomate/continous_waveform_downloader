@@ -12,6 +12,7 @@ from scipy import io
 from quality_error import Quality_error
 from utilities import downweight_ends
 from scipy import signal, fftpack
+import utilities
 
 class Downloader(object):
     def __init__(self, input_path):
@@ -24,7 +25,6 @@ class Downloader(object):
         self._name_ext = "VEL" if parameter_init.processing else "RAW"
         self._name_ext += "tdn_" if parameter_init.timedomain_normalization else "_"
         self._error_code = 0
-
 
     def add_token(self, token):
         self._token = token
@@ -43,7 +43,14 @@ class Downloader(object):
             print "Token does not exist. Init %s without token" % (client)
             self._clients[client] = obspy.clients.fdsn.Client(client)
 
-    def start_download(self, dt, components, channels, max_gap, data_percentage, sleep_time, attempts):
+    def start_download(self, dt = 86400, saving_directory = "./", components = ["Z"], channels = ["B", "H"], 
+                        max_gap = 3600, data_percentage = 0.60, sleep_time = 0, attempts = 1, override = False,
+                        processing = True, timedomain_normalization = False, resample = True, sampling_freq = 5,
+                        detrend_option = "linear", anti_aliasing_filter = [200,1], filter_order = 4,
+                        zero_phase = True, filters = [[100,10], [10,5], [5,1]], envsmooth = 1500, env_exp = 1.5, 
+                        min_weight = 0.1, taper_length_normalization = 1000, plot = False, apply_broadband_filter = False,
+                        broadband_filter = False, apply_whitening = False, spectrumexp = 0.7, espwhitening = 0.05, 
+                        taper_length_whitening = 100):
         for index, row in self._df.iterrows():
             print "{}.{}".format(row["network"],row["station"])
             t_end = obspy.core.UTCDateTime(row["end_time"])
@@ -57,7 +64,7 @@ class Downloader(object):
                         (row["network"], row["station"], component, self._name_ext, t.datetime.strftime("%Y-%m-%d"))
                     start = timeit.default_timer()
                     self._error_code = 0
-                    if (parameter_init.override or not os.path.exists("%s/%s/%s.mat" % (parameter_init.saving_directory, subpath, filename))):
+                    if (override or not os.path.exists("%s/%s/%s.mat" % (saving_directory, subpath, filename))):
                         waveform, inventory = self.get_waveform(
                             row = row,
                             t = t,
@@ -73,23 +80,26 @@ class Downloader(object):
                             waveform = self.process_waveform(
                                 waveform = waveform, 
                                 inventory = inventory,
-                                processing = parameter_init.processing,
-                                normalization = parameter_init.timedomain_normalization,
-                                resample = parameter_init.resample,
-                                sampling_rate = parameter_init.sampling_freq, 
-                                detrend_option = parameter_init.detrend_option,
-                                bandpass_freqmin = parameter_init.bandpass_freqmin, 
-                                bandpass_freqmax = parameter_init.bandpass_freqmax,
-                                filter_order = parameter_init.filter_order,
-                                zero_phase = parameter_init.zero_phase,
-                                filters = parameter_init.filters,
-                                envsmooth = parameter_init.envsmooth, 
-                                env_exp = parameter_init.env_exp, 
-                                min_weight = parameter_init.min_weight, 
-                                taper_length = parameter_init.taper_length, 
-                                plot = parameter_init.plot, 
-                                apply_broadband_filter = parameter_init.apply_broadband_filter,
-                                broadband_filter = parameter_init.broadband_filter
+                                processing = processing,
+                                normalization = timedomain_normalization,
+                                resample = resample,
+                                sampling_rate = sampling_freq, 
+                                detrend_option = detrend_option,
+                                anti_aliasing_filter = anti_aliasing_filter,
+                                filter_order = filter_order,
+                                zero_phase = zero_phase,
+                                filters = filters,
+                                envsmooth = envsmooth, 
+                                env_exp = env_exp, 
+                                min_weight = min_weight, 
+                                taper_length = taper_length_normalization, 
+                                plot = plot, 
+                                apply_broadband_filter = apply_broadband_filter,
+                                broadband_filter = broadband_filter,
+                                apply_whitening = apply_whitening,
+                                spectrumexp = spectrumexp, 
+                                espwhitening = espwhitening, 
+                                taper_length_whitening = taper_length_whitening
                             )
                             if (waveform is not None):
                                 if (not (~np.isfinite(waveform.data)).any()):
@@ -157,10 +167,14 @@ class Downloader(object):
                 attempt += 1
         return None, None
     
-    def process_waveform(self, waveform, inventory, processing, normalization, resample, sampling_rate, detrend_option, 
-        bandpass_freqmin, bandpass_freqmax, filter_order = 4, zero_phase = False, filters = [[30,1]],envsmooth = 1500, 
-        env_exp = 1.5, min_weight = 0.1, taper_length = 1000,plot = False, apply_broadband_filter = False, 
-        broadband_filter = [200,1]):
+    def process_waveform(self, waveform, inventory, processing = True, normalization = False, 
+                        resample = True, sampling_rate = 5, detrend_option = "linear", 
+                        anti_aliasing_filter = [200,1], filter_order = 4, zero_phase = True, 
+                        filters = [[100,10], [10,5], [5,1]], envsmooth = 1500, 
+                        env_exp = 1.5, min_weight = 0.1, taper_length = 1000, plot = False, 
+                        apply_broadband_filter = False, broadband_filter = [200,1], 
+                        apply_whitening = False, spectrumexp = 0.7, espwhitening = 0.05, 
+                        taper_length_whitening = 100):
         start = timeit.default_timer()
         try:
         #if (True):
@@ -179,13 +193,13 @@ class Downloader(object):
                     max_percentage = 0.05
                 )
                 
-                self._processing += "bandpass filter between: {} {} Hz. Filter-order: {}, zerophase: {} -> ".format(
-                    bandpass_freqmin, bandpass_freqmax, filter_order, zero_phase
+                self._processing += "bandpass filter between: {} and {} sec. Filter-order: {}, zerophase: {} -> ".format(
+                    anti_aliasing_filter[0], anti_aliasing_filter[1], filter_order, zero_phase
                 )
                 waveform.filter(
                     type = "bandpass",
-                    freqmin = bandpass_freqmin, 
-                    freqmax = bandpass_freqmax,
+                    freqmin = 1./anti_aliasing_filter[0], 
+                    freqmax = 1./anti_aliasing_filter[1], 
                     corners = filter_order,
                     zerophase = zero_phase
                 )
@@ -202,17 +216,33 @@ class Downloader(object):
 
                 if (normalization):
                     self._processing += "running absolute mean normalization -> "
-                    #print "time domain normalization..."
-                    waveform.data = self.running_absolute_mean(
+                    print "time domain normalization..."
+                    waveform.data = utilities.running_absolute_mean(
                         waveform = waveform,
                         filters = filters,
-                        envsmooth = envsmooth, 
+                        filter_order = filter_order,
+                        envsmooth = envsmooth,
                         env_exp = env_exp,
                         min_weight = min_weight, 
                         taper_length = taper_length, 
                         plot = plot,
                         apply_broadband_filter = apply_broadband_filter,
                         broadband_filter = broadband_filter
+                    )
+                
+                if (apply_whitening):
+                    print "whitening... does not tested properly"
+                    self._processing += "spectral whitening -> "
+                    waveform.data = utilities.spectral_whitening(
+                        data = waveform.data,
+                        sampling_rate = waveform.stats.sampling_rate,
+                        spectrumexp = spectrumexp,
+                        espwhitening = espwhitening,
+                        taper_length = taper_length_whitening,
+                        apply_broadband_filter = apply_broadband_filter,
+                        broadband_filter = broadband_filter,
+                        filter_order = filter_order,
+                        plot = plot
                     )
             else:
                 self._processing += "remove sensitivity ->"
@@ -247,69 +277,6 @@ class Downloader(object):
             return True
         return False
 
-    def running_absolute_mean(self, waveform, filters, envsmooth = 1500, env_exp = 1.5, 
-                        min_weight = 0.1, taper_length = 1000, plot = False,
-                        apply_broadband_filter = True, broadband_filter = [200,1]):
-        data = (signal.detrend(waveform.data, type="linear" )) / np.power(10,9)
-        nb = np.floor(envsmooth/waveform.stats.delta)
-        weight = np.ones((data.shape[0]))
-        boxc = np.ones((int(nb)))/nb
-        nyf = (1./2)*waveform.stats.sampling_rate
-        if (plot):
-            plt.plot(data)
-            plt.title("unfiltered data")
-            plt.show()
-        if (apply_broadband_filter):
-            [b,a] = signal.butter(
-                N = 3,
-                Wn = [1./broadband_filter[0]/nyf, 1./broadband_filter[1]/nyf], 
-                btype='bandpass'
-            )
-            data = signal.filtfilt(
-                b = b,
-                a = a,
-                x = data)
-        for filter in filters:
-            #print filter
-            [b,a] = signal.butter(3,[1./filter[0]/nyf, 1./filter[1]/nyf], btype='bandpass')
-            filtered_data = downweight_ends(signal.filtfilt(b,a,data), wlength = taper_length * waveform.stats.sampling_rate)
-            if (plot):
-                plt.plot(filtered_data)
-                plt.title("filtered data")
-                plt.show()
-            data_env = signal.convolve(abs(filtered_data),boxc,method="fft")
-            data_env = data_env[boxc.shape[0]/ 2 -1: -boxc.shape[0]/ 2]
-            if (plot):
-                plt.plot(data_env)
-                plt.title("envelope")
-                plt.show()
-            #print data_env.shape, self._data.shape
-            data_exponent = np.power(data_env, env_exp)
-            weight = weight * data_exponent / np.mean(data_exponent)
-            if (plot):
-                plt.plot(weight)
-                plt.title("weights")
-                plt.show()
-        water_level = np.mean(weight) * min_weight
-        weight[weight < water_level] = water_level
-        nb = 2*int(taper_length*waveform.stats.sampling_rate)
-        weight[:nb] = np.mean(weight)
-        weight[-nb:] = np.mean(weight)
-        if (plot):
-            plt.plot(weight)
-            plt.title("final weights")
-            plt.show()
-        data = downweight_ends(
-            (data / weight),
-            wlength = taper_length * waveform.stats.sampling_rate
-        )
-
-        if (plot):
-            plt.plot(data)
-            plt.title("filtered data")
-            plt.show()
-        return data
-
     def save_waveform(self, savedir, subdir, filename, waveform, inventory):
         directory = "%s/%s" % (savedir, subdir)
         if not os.path.exists(directory):
@@ -334,6 +301,3 @@ class Downloader(object):
         save = "%s/%s" % (directory, filename)
         print "save:", save
         io.savemat(save,waveform_dictionary)
-
-#TODO:
-#

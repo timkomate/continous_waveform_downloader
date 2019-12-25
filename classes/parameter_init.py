@@ -35,14 +35,14 @@ processing = config.getboolean("PROCESSING", "processing")
 resample = config.getboolean("PROCESSING", "resample")
 detrend_option = config.get("PROCESSING", "detrend_option")
 sampling_freq = config.getint("PROCESSING", "sampling_freq")
-bandpass_freqmin = config.getfloat("PROCESSING", "bandpass_freqmin")
-bandpass_freqmax = config.getfloat("PROCESSING", "bandpass_freqmax")
+anti_aliasing_filter = map(float, config.get("PROCESSING", "anti_aliasing_filter").split(","))
 filter_order = config.getint("PROCESSING", "filter_order")
 zero_phase = config.getboolean("PROCESSING", "zero_phase")
+apply_broadband_filter = config.getboolean("PROCESSING", "apply_broadband_filter")
+broadband_filter = map(float, config.get("PROCESSING", "broadband_filter").split(","))
 
 #[NORMALIZATION]
 timedomain_normalization = config.getboolean("NORMALIZATION", "timedomain_normalization")
-apply_broadband_filter = config.getboolean("NORMALIZATION", "apply_broadband_filter")
 filter_num = config.getint("NORMALIZATION", "filters")
 filters = []
 i = 1
@@ -54,6 +54,11 @@ while i <= filter_num:
 envsmooth = config.getint("NORMALIZATION", "envsmooth")
 env_exp = config.getfloat("NORMALIZATION", "env_exp")
 min_weight = config.getfloat("NORMALIZATION", "min_weight")
-taper_length = config.getint("NORMALIZATION", "taper_length")
+taper_length_tdn = config.getint("NORMALIZATION", "taper_length_tdn")
 plot = config.getboolean("NORMALIZATION", "plot")
-broadband_filter = map(float, config.get("NORMALIZATION", "broadband_filter").split(","))
+
+#[SPECTRAL-WHITENING]
+apply_whitening = config.getboolean("SPECTRAL-WHITENING", "apply_whitening")
+spectrumexp = config.getfloat("SPECTRAL-WHITENING", "spectrumexp")
+espwhitening = config.getfloat("SPECTRAL-WHITENING", "espwhitening")
+taper_length_whitening = config.getint("SPECTRAL-WHITENING", "taper_length_whitening")
