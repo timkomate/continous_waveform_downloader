@@ -49,7 +49,7 @@ class Downloader(object):
                         detrend_option = "linear", anti_aliasing_filter = [200,1], filter_order = 4,
                         zero_phase = True, filters = [[100,10], [10,5], [5,1]], envsmooth = 1500, env_exp = 1.5, 
                         min_weight = 0.1, taper_length_normalization = 1000, plot = False, apply_broadband_filter = False,
-                        broadband_filter = False, apply_whitening = False, spectrumexp = 0.7, espwhitening = 0.05, 
+                        broadband_filter = [200,1], apply_whitening = False, spectrumexp = 0.7, espwhitening = 0.05, 
                         taper_length_whitening = 100):
         for index, row in self._df.iterrows():
             print "{}.{}".format(row["network"],row["station"])

@@ -106,12 +106,10 @@ def spectral_whitening( data, sampling_rate, spectrumexp = 0.7,
         data = data,
         type="linear"
     )
-    print "dadad"
     spectrum = np.fft.rfft(
         a = data,
         n= nextpow2(len(data))
     )
-    print "fafka"
     spectrum_abs = np.abs(spectrum)
     if (plot):
         f = np.fft.rfftfreq(len(data), d=1./sampling_rate)
@@ -135,9 +133,7 @@ def spectral_whitening( data, sampling_rate, spectrumexp = 0.7,
         plt.show()
         
     #whitening
-    print "what"
     spectrum = np.divide(spectrum, np.power(spectrum_abs,spectrumexp))
-    print "dafak"
     #spectrum = downweight_ends(spectrum, wlength = (taper_length * sampling_rate))
     spectrum[0] = 0
 
@@ -147,7 +143,8 @@ def spectral_whitening( data, sampling_rate, spectrumexp = 0.7,
         plt.show()
 
     whitened = np.fft.irfft(
-        a = spectrum
+        a = spectrum,
+        #n = len(data)
     )
         
     whitened = signal.detrend(
