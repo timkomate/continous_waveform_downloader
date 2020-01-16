@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 from setup_logger import logger
 import parameter_init
 import obspy
@@ -203,7 +204,7 @@ class Downloader(object):
                     corners = filter_order,
                     zerophase = zero_phase
                 )
-                if (resample):
+                if (resample and waveform.stats.sampling_rate > sampling_rate):
                     self._processing += "resample to: {} Hz -> ".format(sampling_rate)
                     waveform.interpolate(
                         sampling_rate = sampling_rate,
@@ -216,7 +217,7 @@ class Downloader(object):
 
                 if (normalization):
                     self._processing += "running absolute mean normalization -> "
-                    print "time domain normalization..."
+                    #print "time domain normalization..."
                     waveform.data = utilities.running_absolute_mean(
                         waveform = waveform,
                         filters = filters,
