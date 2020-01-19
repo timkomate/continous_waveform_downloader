@@ -1,5 +1,5 @@
-import matplotlib.pyplot as plt
-from setup_logger import logger
+#import matplotlib.pyplot as plt
+import utilities
 import parameter_init
 import obspy
 import os
@@ -11,9 +11,9 @@ import pandas as pd
 import time, timeit
 from scipy import io
 from quality_error import Quality_error
-from utilities import downweight_ends
 from scipy import signal, fftpack
-import utilities
+
+from setup_logger import logger
 
 class Downloader(object):
     def __init__(self, input_path):
@@ -24,7 +24,8 @@ class Downloader(object):
         self._processing = ""
         self._processing_time = -1
         self._name_ext = "VEL" if parameter_init.processing else "RAW"
-        self._name_ext += "tdn_" if parameter_init.timedomain_normalization else "_"
+        self._name_ext += "tdn" if parameter_init.timedomain_normalization else ""
+        self._name_ext += "wh_" if parameter_init.apply_whitening else "_"
         self._error_code = 0
 
     def add_token(self, token):
@@ -47,7 +48,7 @@ class Downloader(object):
     def start_download(self, dt = 86400, saving_directory = "./", components = ["Z"], channels = ["B", "H"], 
                         max_gap = 3600, data_percentage = 0.60, sleep_time = 0, attempts = 1, override = False,
                         processing = True, timedomain_normalization = False, resample = True, sampling_freq = 5,
-                        detrend_option = "linear", anti_aliasing_filter = [200,1], filter_order = 4,
+                        date_format = "%Y%m%d", detrend_option = "linear", anti_aliasing_filter = [200,1], filter_order = 4,
                         zero_phase = True, filters = [[100,10], [10,5], [5,1]], envsmooth = 1500, env_exp = 1.5, 
                         min_weight = 0.1, taper_length_normalization = 1000, plot = False, apply_broadband_filter = False,
                         broadband_filter = [200,1], apply_whitening = False, spectrumexp = 0.7, espwhitening = 0.05, 
@@ -60,11 +61,12 @@ class Downloader(object):
             for component in components:
                 t = obspy.core.UTCDateTime(row["start_time"])
                 while t <= t_end:
-                    subpath = "%s/%s/%s/" % (component,t.year, t.datetime.strftime("%Y%m%d"))
+                    subpath = "%s/%s/%s/" % (component,t.year, t.datetime.strftime(date_format))
                     filename = "%s.%s.%s_%s%s" % \
-                        (row["network"], row["station"], component, self._name_ext, t.datetime.strftime("%Y-%m-%d"))
+                        (row["network"], row["station"], component, self._name_ext, t.datetime.strftime(date_format))
                     start = timeit.default_timer()
                     self._error_code = 0
+                    message = "{}.{}.{}.{}".format(row["network"],row["station"], component, t.strftime(date_format))
                     if (override or not os.path.exists("%s/%s/%s.mat" % (saving_directory, subpath, filename))):
                         waveform, inventory = self.get_waveform(
                             row = row,
@@ -111,18 +113,18 @@ class Downloader(object):
                                         waveform = waveform,
                                         inventory = inventory
                                     )
-                                    logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._processing_time)
+                                    logger.info("%s::%s::%s",message, timeit.default_timer()-start, self._processing_time)
                                 else:
                                     self._error_code = -7
-                                    logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
+                                    logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
                             else:
                                 self._error_code = -6
-                                logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
+                                logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
                         else:
-                            logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
+                            logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
                     else:
                         self._error_code = -4
-                        logger.debug("%s.%s.%s::%s::%s", row["network"],row["station"], t.strftime("%Y%m%d"), timeit.default_timer()-start, self._error_code)
+                        logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
                     t += dt               
     
     def get_waveform(self, row, t, component, channels, dt, max_gap, data_percentage, sleep_time, attempts):
@@ -170,13 +172,14 @@ class Downloader(object):
     
     def process_waveform(self, waveform, inventory, processing = True, normalization = False, 
                         resample = True, sampling_rate = 5, detrend_option = "linear", 
-                        anti_aliasing_filter = [200,1], filter_order = 4, zero_phase = True, 
+                        anti_aliasing_filter = 1, filter_order = 4, zero_phase = True, 
                         filters = [[100,10], [10,5], [5,1]], envsmooth = 1500, 
                         env_exp = 1.5, min_weight = 0.1, taper_length = 1000, plot = False, 
                         apply_broadband_filter = False, broadband_filter = [200,1], 
                         apply_whitening = False, spectrumexp = 0.7, espwhitening = 0.05, 
                         taper_length_whitening = 100):
         start = timeit.default_timer()
+        self._processing = ""
         try:
         #if (True):
             if processing:
@@ -194,13 +197,12 @@ class Downloader(object):
                     max_percentage = 0.05
                 )
                 
-                self._processing += "bandpass filter between: {} and {} sec. Filter-order: {}, zerophase: {} -> ".format(
-                    anti_aliasing_filter[0], anti_aliasing_filter[1], filter_order, zero_phase
+                self._processing += "lowpass filter at: {} sec. Filter-order: {}, zerophase: {} -> ".format(
+                    anti_aliasing_filter, filter_order, zero_phase
                 )
                 waveform.filter(
-                    type = "bandpass",
-                    freqmin = 1./anti_aliasing_filter[0], 
-                    freqmax = 1./anti_aliasing_filter[1], 
+                    type = "lowpass",
+                    freq = 1./anti_aliasing_filter, 
                     corners = filter_order,
                     zerophase = zero_phase
                 )
@@ -214,6 +216,18 @@ class Downloader(object):
                 waveform.remove_response(
                     inventory = inventory
                 )
+
+                if (apply_broadband_filter):
+                    self._processing += "bandpass filter between: {} and {} sec. Filter-order: {}, zerophase: {} -> ".format(
+                        broadband_filter[0], broadband_filter[1], filter_order, zero_phase
+                    )
+                    waveform.filter(
+                        type = "bandpass",
+                        freqmin = 1./broadband_filter[0], 
+                        freqmax = 1./broadband_filter[1], 
+                        corners = filter_order,
+                        zerophase = zero_phase
+                    )
 
                 if (normalization):
                     self._processing += "running absolute mean normalization -> "

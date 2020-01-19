@@ -50,6 +50,7 @@ class Download_driver(object):
             timedomain_normalization=parameter_init.timedomain_normalization,
             resample=parameter_init.resample,
             sampling_freq=parameter_init.sampling_freq,
+            date_format = parameter_init.date_format,
             detrend_option=parameter_init.detrend_option,
             anti_aliasing_filter=parameter_init.anti_aliasing_filter,
             filter_order=parameter_init.filter_order,
