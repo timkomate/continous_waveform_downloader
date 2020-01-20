@@ -113,7 +113,7 @@ def spectral_whitening( data, sampling_rate, spectrumexp = 0.7,
     )
     spectrum_abs = np.abs(spectrum)
     if (plot):
-        f = np.fft.rfftfreq(len(data), d=1./sampling_rate)
+        f = np.fft.rfftfreq(nextpow2(len(data)), d=1./sampling_rate)
         plt.plot(f,spectrum)
         plt.plot(f,spectrum_abs)
         plt.title("specrtum and ampl. spectrum")
