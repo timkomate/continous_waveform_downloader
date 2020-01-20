@@ -246,7 +246,7 @@ class Downloader(object):
                     )
                 
                 if (apply_whitening):
-                    print "whitening... does not tested properly"
+                    #print "whitening... does not tested properly"
                     self._processing += "spectral whitening -> "
                     waveform.data = utilities.spectral_whitening(
                         data = waveform.data,

@@ -136,7 +136,7 @@ def spectral_whitening( data, sampling_rate, spectrumexp = 0.7,
     #whitening
     spectrum = np.divide(spectrum, np.power(spectrum_abs,spectrumexp))
     #spectrum = downweight_ends(spectrum, wlength = (taper_length * sampling_rate))
-    spectrum[0] = 0
+    #spectrum[0] = 0
 
     if (plot):
         plt.plot(f,np.abs(spectrum))
@@ -145,9 +145,11 @@ def spectral_whitening( data, sampling_rate, spectrumexp = 0.7,
 
     whitened = np.fft.irfft(
         a = spectrum,
-        #n = len(data)
+        n = nextpow2(len(data))
     )
-        
+    
+    whitened = whitened[0:len(data)]
+
     whitened = signal.detrend(
         data = whitened,
         type="linear"
@@ -176,6 +178,6 @@ def spectral_whitening( data, sampling_rate, spectrumexp = 0.7,
         plt.title("whitened signal after filtering")
         plt.show()
     #remove mean
-    whitened = whitened * np.mean(np.abs(whitened))
-    whitened = np.append(whitened, 0)
+    whitened = whitened - np.mean(np.abs(whitened))
+    #whitened = np.append(whitened, 0)
     return whitened
