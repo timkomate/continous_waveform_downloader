@@ -18,7 +18,7 @@ def running_absolute_mean(waveform, filters, filter_order = 4, envsmooth = 1500,
                     env_exp = 1.5, min_weight = 0.1, taper_length = 1000, plot = False,
                     apply_broadband_filter = True, broadband_filter = [200,1]):
     
-    data = (signal.detrend(waveform.data, type="linear" )) / np.power(10,9)
+    data = (signal.detrend(waveform.data, type="linear" )) #/ np.power(10,9)
     nb = np.floor(envsmooth/waveform.stats.delta)
     weight = np.ones((data.shape[0]))
     boxc = np.ones((int(nb)))/nb

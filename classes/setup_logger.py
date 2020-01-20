@@ -10,7 +10,7 @@ if (not os.path.exists("./logs")):
 
 log_format = "%(asctime)s::%(levelname)s::%(filename)s::%(lineno)d::%(message)s"
 logging.basicConfig(
-    filename="./logs/%s.log".format(dt_string), 
+    filename="./logs/{}.log".format(dt_string), 
     level='INFO', 
     format=log_format
 )
