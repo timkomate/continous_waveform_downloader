@@ -30,6 +30,3 @@ if __name__ == "__main__":
         dw_d.start(core_number = parameter_init.number_of_cpus)
 
 #TODO
-#Does the 10^-9 factor really necessarily?
-#Whitening is slow, probably due to the len of my data vector. Could be solved by next2pow.
-#partly solved but needs to check

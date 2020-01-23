@@ -1,6 +1,6 @@
 from obspy.clients.fdsn import RoutingClient, Client
 import obspy
-from setup_logger import logger
+#from setup_logger import logger
 import json
 
 class Metadata(object):
@@ -14,7 +14,7 @@ class Metadata(object):
         self._end_year = obspy.core.UTCDateTime(end_year)
         print "Generating metadata..."
         for node in EIDA_nodes:
-            #print node
+            print node
             client = obspy.clients.fdsn.Client(node)
             inv = client.get_stations(
                 network = network,
@@ -36,19 +36,23 @@ class Metadata(object):
             if network.code not in self._station_dictionary:
                 self._station_dictionary[network.code] = {}
             for station in network:
-                if station.code not in self._station_dictionary[network.code]:
+                start_op, end_op = Metadata.operation_time(station, self._start_year, self._end_year)
+                if (station.code not in self._station_dictionary[network.code]):
                     self._station_dictionary[network.code][station.code] = {
                         "latitude" : station.latitude,
                         "longitude" : station.longitude,
                         "elevation" : station.elevation,
-                        "start_date" : start_year_string,
-                        "end_date" : end_year_string,
+                        "start_date" : [str(start_op)],
+                        "end_date" : [str(end_op)],
                         "status" : station.restricted_status,
                         "services" : [service]
                     }
-                    self._output_text.append("%s %s %s %s" % (network.code, station.code, start_year_string, end_year_string))
+                    #self._output_text.append("%s %s %s %s" % (network.code, station.code, start_year_string, end_year_string))
                 elif (service not in self._station_dictionary[network.code][station.code]["services"]):
                     self._station_dictionary[network.code][station.code]["services"].append(service)
+                else:
+                    self._station_dictionary[network.code][station.code]["start_date"].append(str(start_op))
+                    self._station_dictionary[network.code][station.code]["end_date"].append(str(end_op))
         
 
     def save_json(self, save_path):
@@ -59,13 +63,16 @@ class Metadata(object):
         output = open(save_path,'w')
         for network in self._station_dictionary:
             for station in self._station_dictionary[network]:
-                output.write("%s %s %s %s %s\n" % (
-                    self._station_dictionary[network][station]["services"][0], 
-                    network, 
-                    station, 
-                    self._station_dictionary[network][station]["start_date"],
-                    self._station_dictionary[network][station]["end_date"]
-                    )  
+                print station
+                c = len(self._station_dictionary[network][station]["start_date"])
+                for i in range(c):
+                    output.write("%s %s %s %s %s\n" % (
+                        self._station_dictionary[network][station]["services"][0], 
+                        network, 
+                        station, 
+                        self._station_dictionary[network][station]["start_date"][i],
+                        self._station_dictionary[network][station]["end_date"][i]
+                        )  
                 )
     
     def extract_station_coordinates(self, save_path):
@@ -93,7 +100,7 @@ class Metadata(object):
         return self._inv
 
     @staticmethod
-    def operation_time(sta,t_start, t_end):
+    def operation_time(sta,t_start, t_end, output_format = "%Y-%m-%d"):
         station_start = sta.start_date
         station_end = sta.end_date
         if t_start < station_start:
@@ -106,7 +113,7 @@ class Metadata(object):
             op_end = t_end
         else:
             op_end = station_end
-        return [op_start, op_end]
+        return [op_start.strftime(output_format), op_end.strftime(output_format)]
 
     
 
