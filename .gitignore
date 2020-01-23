@@ -12,5 +12,5 @@ logs/
 *.mat
 input*/
 gmt*
+response/
 *test*
-plot*

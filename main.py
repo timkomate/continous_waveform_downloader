@@ -16,6 +16,8 @@ if __name__ == "__main__":
             max_radius = parameter_init.max_radius,
             start_year = parameter_init.start_year,
             end_year = parameter_init.end_year,
+            EIDA_nodes= parameter_init.EIDA_nodes,
+            save_response= parameter_init.save_response
         )
         metadata.save_json(save_path = parameter_init.json_path)
         metadata.make_inputfile(save_path = parameter_init.station_list_path)
@@ -30,6 +32,3 @@ if __name__ == "__main__":
         dw_d.start(core_number = parameter_init.number_of_cpus)
 
 #TODO
-#Does the 10^-9 factor really necessarily?
-#Whitening is slow, probably due to the len of my data vector. Could be solved by next2pow.
-#partly solved but needs to check

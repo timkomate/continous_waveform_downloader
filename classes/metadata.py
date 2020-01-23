@@ -2,35 +2,49 @@ from obspy.clients.fdsn import RoutingClient, Client
 import obspy
 #from setup_logger import logger
 import json
+import os
 
 class Metadata(object):
     def __init__(self, lat, lon, max_radius, start_year, end_year,
-        channel = "*H*", network = "*", level = "station",
+        channel = "?H?", network = "*", save_response = False, response_path = "./response/",
         EIDA_nodes = [ "ODC", "GFZ", "RESIF", "INGV", "ETH", "BGR", "NIEP", "KOERI", "LMU", "NOA", "IRIS" ]
         ):
         self._station_dictionary = {}
-        self._output_text = []
+        level = "response" if save_response else "station"
         self._start_year = obspy.core.UTCDateTime(start_year)
         self._end_year = obspy.core.UTCDateTime(end_year)
         print "Generating metadata..."
         for node in EIDA_nodes:
-            print node
-            client = obspy.clients.fdsn.Client(node)
-            inv = client.get_stations(
-                network = network,
-                channel = channel,
-                starttime = start_year,
-                endtime = end_year,
-                latitude = lat, 
-                longitude = lon,
-                level = level,
-                maxradius = max_radius
-            )
-            self.append_dictionary(inv, node)
+            print node,
+            try:
+                client = obspy.clients.fdsn.Client(node)
+                inv = client.get_stations(
+                    network = network,
+                    channel = channel,
+                    starttime = start_year,
+                    endtime = end_year,
+                    latitude = lat, 
+                    longitude = lon,
+                    level = level,
+                    maxradius = max_radius
+                )
+                if (save_response):
+                    self.save_inventory(
+                        inventory = inv,
+                        save_path = response_path,
+                        filename = "{}.resp".format(node),
+                        format = "STATIONXML"
+                    )
+                self.append_dictionary(inv, node)
+                print "success"
+            except obspy.clients.fdsn.header.FDSNException as e:
+                print "failed -- FDSNException"
+                print(e)
+            except:
+                print("failed -- unknown")
+            
 
     def append_dictionary(self, inv, service):
-        start_year_string = "%s-%s-%s" % (self._start_year.year, self._start_year.month, self._start_year.day)
-        end_year_string = "%s-%s-%s" % (self._end_year.year, self._end_year.month, self._end_year.day)
         for network in inv:
             #print network.code
             if network.code not in self._station_dictionary:
@@ -47,7 +61,6 @@ class Metadata(object):
                         "status" : station.restricted_status,
                         "services" : [service]
                     }
-                    #self._output_text.append("%s %s %s %s" % (network.code, station.code, start_year_string, end_year_string))
                 elif (service not in self._station_dictionary[network.code][station.code]["services"]):
                     self._station_dictionary[network.code][station.code]["services"].append(service)
                 else:
@@ -63,7 +76,7 @@ class Metadata(object):
         output = open(save_path,'w')
         for network in self._station_dictionary:
             for station in self._station_dictionary[network]:
-                print station
+                #print station
                 c = len(self._station_dictionary[network][station]["start_date"])
                 for i in range(c):
                     output.write("%s %s %s %s %s\n" % (
@@ -87,9 +100,11 @@ class Metadata(object):
                     )  
                 )
 
-    def save_inventory(self, save_path, format = "STATIONXML"):
-        self._inv.write(
-            path_or_file_object = save_path,
+    def save_inventory(self, inventory, save_path, filename, format = "STATIONXML"):
+        if not os.path.exists(save_path):
+            os.makedirs(save_path)
+        inventory.write(
+            path_or_file_object = "{}/{}".format(save_path, filename),
             format = format
         )  
     

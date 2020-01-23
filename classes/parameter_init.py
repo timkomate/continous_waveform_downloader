@@ -5,6 +5,8 @@ config.read("./config.cfg")
 
 #[METADATA]
 download_metadata = config.getboolean("METADATA", "download_metadata")
+save_response = config.getboolean("METADATA", "save_response")
+EIDA_nodes = config.get("METADATA", "EIDA_nodes").split(',')
 latitude = config.getfloat("METADATA", "latitude")
 longitude = config.getfloat("METADATA", "longitude")
 max_radius = config.getfloat("METADATA", "max_radius")
