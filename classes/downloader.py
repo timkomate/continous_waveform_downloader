@@ -168,6 +168,7 @@ class Downloader(object):
                 except:
                     self._error_code = -2
                 attempt += 1
+                time.sleep(sleep_time)
         return None, None
     
     def process_waveform(self, waveform, inventory, processing = True, normalization = False, 
