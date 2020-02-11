@@ -1,12 +1,10 @@
-from classes import metadata, downloader, download_driver, parameter_init
+from classes import metadata, parameter_init
 import obspy
 import os, glob
 import ConfigParser
 
 
 if __name__ == "__main__":
-    #print parameter_init.perform_download
-
     print "obspy version:",obspy.core.util.version.read_release_version()
     
     if (parameter_init.download_metadata):
@@ -24,6 +22,7 @@ if __name__ == "__main__":
         metadata.extract_station_coordinates(save_path = parameter_init.coordinate_output)
     
     if (parameter_init.perform_download):
+        from classes import downloader, download_driver
         input_path = parameter_init.station_input_path
         input_list = [f for f in glob.glob("%s/*.text*" % (input_path))]
         input_list = sorted(input_list)

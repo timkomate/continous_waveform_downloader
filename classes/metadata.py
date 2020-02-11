@@ -1,6 +1,5 @@
 from obspy.clients.fdsn import RoutingClient, Client
 import obspy
-#from setup_logger import logger
 import json
 import os
 

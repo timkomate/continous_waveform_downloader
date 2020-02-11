@@ -66,7 +66,7 @@ class Downloader(object):
                         (row["network"], row["station"], component, self._name_ext, t.datetime.strftime(date_format))
                     start = timeit.default_timer()
                     self._error_code = 0
-                    message = "{}.{}.{}.{}".format(row["network"],row["station"], component, t.strftime(date_format))
+                    message = "{}::{}::{}::{}::{}".format(row["client"],row["network"],row["station"], component, t.strftime(date_format))
                     if (override or not os.path.exists("%s/%s/%s.mat" % (saving_directory, subpath, filename))):
                         waveform, inventory = self.get_waveform(
                             row = row,
