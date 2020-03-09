@@ -7,10 +7,10 @@ import os
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    for filepath in glob.iglob('./response/2007/RESIF.resp'):
-        
+    year = "2009"
+    for filepath in glob.iglob('./response/{}/*.resp'.format(year)):
         node_name = filepath.split("/")[-1].split(".")[0]
-        save_path = "./response/plots/{}".format(node_name)
+        save_path = "./response/{}/plots/{}".format(year,node_name)
         print(filepath)
         if not os.path.exists(save_path):
             os.makedirs(save_path)

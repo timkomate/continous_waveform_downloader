@@ -3,7 +3,7 @@ import pandas as pd
 import glob
 
 
-input_name = "./input2007.text"
+input_name = "../input2009.text"
 i = pd.read_csv(
     filepath_or_buffer = input_name,
     delimiter= " ",
@@ -15,7 +15,7 @@ i.columns = ["node", "network", "station", "start_d", "end_d"]
 df = pd.DataFrame()
 #df.columns = ["node", "network", "station", "start_d", "end_d"]
 
-filepath = "./filter2007"
+filepath = "../filter2009"
 files = [f for f in glob.glob(filepath + "/*.text")]
 for f in files:
     d = pd.read_csv(
