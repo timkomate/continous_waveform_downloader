@@ -15,6 +15,8 @@ if __name__ == "__main__":
             start_year = parameter_init.start_year,
             end_year = parameter_init.end_year,
             EIDA_nodes= parameter_init.EIDA_nodes,
+            network = parameter_init.network,
+            channel = parameter_init.meta_channels,
             save_response= parameter_init.save_response
         )
         metadata.save_json(save_path = parameter_init.json_path)

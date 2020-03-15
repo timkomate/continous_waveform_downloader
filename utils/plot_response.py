@@ -7,7 +7,7 @@ import os
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    year = "2009"
+    year = "2008"
     for filepath in glob.iglob('./response/{}/*.resp'.format(year)):
         node_name = filepath.split("/")[-1].split(".")[0]
         save_path = "./response/{}/plots/{}".format(year,node_name)
