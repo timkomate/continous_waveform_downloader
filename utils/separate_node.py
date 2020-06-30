@@ -1,6 +1,6 @@
 #/usr/bin/python
 
-input_name = "./input.text"
+input_name = "../2015/input2015_f.text"
 input = open(input_name,'r').read().splitlines()
 
 output_a = open("%sa" % (input_name), 'w')

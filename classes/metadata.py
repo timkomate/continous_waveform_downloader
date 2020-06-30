@@ -12,9 +12,9 @@ class Metadata(object):
         level = "response" if save_response else "station"
         self._start_year = obspy.core.UTCDateTime(start_year)
         self._end_year = obspy.core.UTCDateTime(end_year)
-        print "Generating metadata..."
+        print ("Generating metadata...")
         for node in EIDA_nodes:
-            print node,
+            print (node,)
             try:
                 client = obspy.clients.fdsn.Client(node)
                 inv = client.get_stations(
@@ -35,9 +35,9 @@ class Metadata(object):
                         format = "STATIONXML"
                     )
                 self.append_dictionary(inv, node)
-                print "success"
+                print ("success")
             except obspy.clients.fdsn.header.FDSNException as e:
-                print "failed -- FDSNException"
+                print ("failed -- FDSNException")
                 print(e)
             except:
                 print("failed -- unknown")

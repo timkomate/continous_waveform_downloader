@@ -1,6 +1,6 @@
 #import matplotlib.pyplot as plt
-import utilities
-import parameter_init
+from . import utilities
+from . import parameter_init
 import obspy
 import os
 import numpy as np
@@ -10,10 +10,10 @@ import sys
 import pandas as pd
 import time, timeit
 from scipy import io
-from quality_error import Quality_error
+from .quality_error import Quality_error
 from scipy import signal, fftpack
 
-from setup_logger import logger
+from .setup_logger import logger
 
 class Downloader(object):
     def __init__(self, input_path):
@@ -39,10 +39,10 @@ class Downloader(object):
         try:
             self._clients[client] = obspy.clients.fdsn.Client(client, eida_token = self._token)
         except obspy.clients.fdsn.client.FDSNException:
-            print "Token is not accepted. Init %s without token" % (client)
+            print ("Token is not accepted. Init %s without token" % (client))
             self._clients[client] = obspy.clients.fdsn.Client(client)
         except ValueError:
-            print "Token does not exist. Init %s without token" % (client)
+            print ("Token does not exist. Init %s without token" % (client))
             self._clients[client] = obspy.clients.fdsn.Client(client)
 
     def start_download(self, dt = 86400, saving_directory = "./", components = ["Z"], channels = ["B", "H"], 
@@ -54,7 +54,7 @@ class Downloader(object):
                         broadband_filter = [200,1], apply_whitening = False, spectrumexp = 0.7, espwhitening = 0.05, 
                         taper_length_whitening = 100):
         for index, row in self._df.iterrows():
-            print "{}.{}".format(row["network"],row["station"])
+            print ("{}.{}".format(row["network"],row["station"]))
             t_end = obspy.core.UTCDateTime(row["end_time"])
             if(row["client"] not in self._clients):
                 self.add_single_client(row["client"])
@@ -315,5 +315,5 @@ class Downloader(object):
             "channel": str(waveform.stats.channel)
         }
         save = "%s/%s" % (directory, filename)
-        print "save:", save
+        print ("save:", save)
         io.savemat(save,waveform_dictionary)
