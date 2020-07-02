@@ -1,12 +1,13 @@
+from __future__ import print_function
 import multiprocessing
 from classes import downloader, metadata, parameter_init
 
 class Download_driver(object):
-    def __init__(self, filenames):
-        self._filenames = filenames
+    def __init__(self, dfs):
+        self._dfs = dfs
 
-    def __call__(self, filename):
-        self.go(filename)
+    def __call__(self, df):
+        self.go(df)
 
     def make_metadata(self):
         if (parameter_init.download_metadata):
@@ -26,15 +27,14 @@ class Download_driver(object):
     def start(self, core_number = multiprocessing.cpu_count()):
         if core_number < 1:
             core_number = multiprocessing.cpu_count()
-        print ("Number of cores:", core_number)
+        print("Number of cores:", core_number)
         pool = multiprocessing.Pool(core_number)
-        pool.map(self, self._filenames)
+        pool.map(self, self._dfs)
         pool.close()
         pool.join()
     
-    def go(self, input_name):
-        print (input_name)
-        dw = downloader.Downloader(input_path = input_name)
+    def go(self, df):
+        dw = downloader.Downloader(df = df)
         dw.add_token(token = parameter_init.token_path)
         dw.start_download(
             dt = parameter_init.dt,

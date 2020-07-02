@@ -13,6 +13,6 @@ logging.basicConfig(
     filename="./logs/{}.log".format(dt_string), 
     level='INFO', 
     format=log_format
-)
+    )
 
 logger = logging.getLogger("data-download")

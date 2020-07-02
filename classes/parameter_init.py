@@ -4,7 +4,6 @@ config = configparser.ConfigParser()
 config.read("./config.cfg")
 
 #[METADATA]
-download_metadata = config.getboolean("METADATA", "download_metadata")
 save_response = config.getboolean("METADATA", "save_response")
 EIDA_nodes = config.get("METADATA", "EIDA_nodes").split(',')
 network = config.get("METADATA", "network")
@@ -19,7 +18,6 @@ station_list_path = config.get("METADATA", "station_list_path")
 coordinate_output = config.get("METADATA", "coordinate_output")
 
 #[DOWNLOAD]
-perform_download = config.getboolean("DOWNLOAD", "perform_download")
 token_path = config.get("DOWNLOAD", "token_path")
 station_input_path = config.get("DOWNLOAD", "station_list_path")
 number_of_cpus = config.getint("DOWNLOAD", "number_of_cpus")

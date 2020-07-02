@@ -2,6 +2,7 @@ from obspy.clients.fdsn import RoutingClient, Client
 import obspy
 import json
 import os
+import sys
 
 class Metadata(object):
     def __init__(self, lat, lon, max_radius, start_year, end_year,
@@ -14,7 +15,6 @@ class Metadata(object):
         self._end_year = obspy.core.UTCDateTime(end_year)
         print ("Generating metadata...")
         for node in EIDA_nodes:
-            print (node,)
             try:
                 client = obspy.clients.fdsn.Client(node)
                 inv = client.get_stations(
@@ -28,6 +28,8 @@ class Metadata(object):
                     maxradius = max_radius
                 )
                 if (save_response):
+                    if (not os.path.exists(response_path)):
+                        os.mkdir(response_path)
                     self.save_inventory(
                         inventory = inv,
                         save_path = response_path,
@@ -35,12 +37,16 @@ class Metadata(object):
                         format = "STATIONXML"
                     )
                 self.append_dictionary(inv, node)
-                print ("success")
+                print("{} -- success".format(node))
             except obspy.clients.fdsn.header.FDSNException as e:
-                print ("failed -- FDSNException")
+                print ("{} -- failed: FDSNException".format(node))
                 print(e)
+            except KeyboardInterrupt:
+                print("failed -- killed")
+                sys.exit(1)
             except:
-                print("failed -- unknown")
+                print("{} -- failed: unknown".format(node))
+
             
 
     def append_dictionary(self, inv, service):

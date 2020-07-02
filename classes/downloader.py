@@ -1,3 +1,4 @@
+from __future__ import print_function
 #import matplotlib.pyplot as plt
 from . import utilities
 from . import parameter_init
@@ -10,15 +11,14 @@ import sys
 import pandas as pd
 import time, timeit
 from scipy import io
-from .quality_error import Quality_error
+from .downloader_exceptions import Quality_error, Waveform_excist, Waveform_problem
 from scipy import signal, fftpack
 
 from .setup_logger import logger
 
 class Downloader(object):
-    def __init__(self, input_path):
-        self._df = pd.read_csv(input_path, header = None, delimiter = " ", comment='#')
-        self._df.columns = [ "client", "network", "station", "start_time", "end_time" ]
+    def __init__(self, df):
+        self._df = df
         self._clients = {}
         self._token = ""
         self._processing = ""
@@ -35,14 +35,17 @@ class Downloader(object):
         for client in list_of_clients:
             self.add_single_client(client)
 
+    def reinit_client(self, client):
+        
+
     def add_single_client(self, client):
         try:
             self._clients[client] = obspy.clients.fdsn.Client(client, eida_token = self._token)
         except obspy.clients.fdsn.client.FDSNException:
-            print ("Token is not accepted. Init %s without token" % (client))
+            print ("Token is not accepted. Init {} without token".format(client))
             self._clients[client] = obspy.clients.fdsn.Client(client)
         except ValueError:
-            print ("Token does not exist. Init %s without token" % (client))
+            print ("Token does not exist. Init {} without token".format(client))
             self._clients[client] = obspy.clients.fdsn.Client(client)
 
     def start_download(self, dt = 86400, saving_directory = "./", components = ["Z"], channels = ["B", "H"], 
@@ -67,7 +70,9 @@ class Downloader(object):
                     start = timeit.default_timer()
                     self._error_code = 0
                     message = "{}::{}::{}::{}::{}".format(row["client"],row["network"],row["station"], component, t.strftime(date_format))
-                    if (override or not os.path.exists("%s/%s/%s.mat" % (saving_directory, subpath, filename))):
+                    try:
+                        if (not override or os.path.exists("{}/{}/{}.mat".format(saving_directory, subpath, filename))):
+                            raise Waveform_excist("waveform excist")
                         waveform, inventory = self.get_waveform(
                             row = row,
                             t = t,
@@ -79,57 +84,53 @@ class Downloader(object):
                             sleep_time = sleep_time, 
                             attempts = attempts
                         )
-                        if (waveform is not None and inventory is not None):
-                            waveform = self.process_waveform(
-                                waveform = waveform, 
-                                inventory = inventory,
-                                processing = processing,
-                                normalization = timedomain_normalization,
-                                resample = resample,
-                                sampling_rate = sampling_freq, 
-                                detrend_option = detrend_option,
-                                anti_aliasing_filter = anti_aliasing_filter,
-                                filter_order = filter_order,
-                                zero_phase = zero_phase,
-                                filters = filters,
-                                envsmooth = envsmooth, 
-                                env_exp = env_exp, 
-                                min_weight = min_weight, 
-                                taper_length = taper_length_normalization, 
-                                plot = plot, 
-                                apply_broadband_filter = apply_broadband_filter,
-                                broadband_filter = broadband_filter,
-                                apply_whitening = apply_whitening,
-                                spectrumexp = spectrumexp, 
-                                espwhitening = espwhitening, 
-                                taper_length_whitening = taper_length_whitening
-                            )
-                            if (waveform is not None):
-                                if (not (~np.isfinite(waveform.data)).any()):
-                                    self.save_waveform(
-                                        savedir = parameter_init.saving_directory,
-                                        subdir = subpath,
-                                        filename = filename, 
-                                        waveform = waveform,
-                                        inventory = inventory
-                                    )
-                                    logger.info("%s::%s::%s",message, timeit.default_timer()-start, self._processing_time)
-                                else:
-                                    self._error_code = -7
-                                    logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
-                            else:
-                                self._error_code = -6
-                                logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
-                        else:
-                            logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
-                    else:
+                        if (waveform is None or inventory is None):
+                            raise Waveform_problem([row["network"], row["station"], t])
+                        waveform = self.process_waveform(
+                            waveform = waveform, 
+                            inventory = inventory,
+                            processing = processing,
+                            normalization = timedomain_normalization,
+                            resample = resample,
+                            sampling_rate = sampling_freq, 
+                            detrend_option = detrend_option,
+                            anti_aliasing_filter = anti_aliasing_filter,
+                            filter_order = filter_order,
+                            zero_phase = zero_phase,
+                            filters = filters,
+                            envsmooth = envsmooth, 
+                            env_exp = env_exp, 
+                            min_weight = min_weight, 
+                            taper_length = taper_length_normalization, 
+                            plot = plot, 
+                            apply_broadband_filter = apply_broadband_filter,
+                            broadband_filter = broadband_filter,
+                            apply_whitening = apply_whitening,
+                            spectrumexp = spectrumexp, 
+                            espwhitening = espwhitening, 
+                            taper_length_whitening = taper_length_whitening
+                        )
+                        if ((~np.isfinite(waveform.data)).any()):
+                            raise Waveform_problem([row["network"], row["station"], t])
+                        self.save_waveform(
+                            savedir = parameter_init.saving_directory,
+                            subdir = subpath,
+                            filename = filename, 
+                            waveform = waveform,
+                            inventory = inventory
+                        )
+                        logger.info("%s::%s::%s",message, timeit.default_timer()-start, self._processing_time)
+                    except Waveform_excist:
                         self._error_code = -4
+                        logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
+                    except Waveform_problem:
+                        self._error_code = -6
                         logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
                     t += dt               
     
     def get_waveform(self, row, t, component, channels, dt, max_gap, data_percentage, sleep_time, attempts):
         for channel in channels:
-            con = "%sH%s" % (channel, component)
+            con = "{}H{}".format(channel, component)
             attempt = 1
             while attempt <= attempts:
                 try:
