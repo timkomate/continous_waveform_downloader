@@ -11,7 +11,8 @@ import sys
 import pandas as pd
 import time, timeit
 from scipy import io
-from .downloader_exceptions import Quality_error, Waveform_excist, Waveform_problem
+from .downloader_exceptions import Quality_error, Waveform_exist, Waveform_problem, Inventory_problem, Unknown_problem
+from .downloader_exceptions import FDSN_problem
 from scipy import signal, fftpack
 
 from .setup_logger import logger
@@ -36,7 +37,8 @@ class Downloader(object):
             self.add_single_client(client)
 
     def reinit_client(self, client):
-        
+        self._clients.pop(client)
+        self.add_single_client(client)
 
     def add_single_client(self, client):
         try:
@@ -71,21 +73,20 @@ class Downloader(object):
                     self._error_code = 0
                     message = "{}::{}::{}::{}::{}".format(row["client"],row["network"],row["station"], component, t.strftime(date_format))
                     try:
-                        if (not override or os.path.exists("{}/{}/{}.mat".format(saving_directory, subpath, filename))):
-                            raise Waveform_excist("waveform excist")
+                    #if True:
+                        if (not override and os.path.exists("{}/{}/{}.mat".format(saving_directory, subpath, filename))):
+                            raise Waveform_exist("waveform exist")
                         waveform, inventory = self.get_waveform(
                             row = row,
                             t = t,
                             component = component,
                             channels = channels,
-                            dt = dt, 
+                            dt = dt,
                             max_gap = max_gap, 
                             data_percentage = data_percentage, 
                             sleep_time = sleep_time, 
                             attempts = attempts
                         )
-                        if (waveform is None or inventory is None):
-                            raise Waveform_problem([row["network"], row["station"], t])
                         waveform = self.process_waveform(
                             waveform = waveform, 
                             inventory = inventory,
@@ -119,13 +120,28 @@ class Downloader(object):
                             waveform = waveform,
                             inventory = inventory
                         )
-                        logger.info("%s::%s::%s",message, timeit.default_timer()-start, self._processing_time)
-                    except Waveform_excist:
-                        self._error_code = -4
-                        logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
+                        logger.info("{}::{}::{}".format(message, timeit.default_timer()-start, self._processing_time))
+                    except FDSN_problem:
+                        self._error_code = -1
+                        logger.info("{}::{}::{}".format(message, timeit.default_timer()-start, self._error_code))
                     except Waveform_problem:
+                        self._error_code = -2
+                        logger.info("{}::{}::{}".format(message, timeit.default_timer()-start, self._error_code))
+                    except Inventory_problem:
+                        self._error_code = -3
+                        logger.info("{}::{}::{}".format(message, timeit.default_timer()-start, self._error_code))
+                    except Waveform_exist:
+                        self._error_code = -4
+                        logger.info("{}::{}::{}".format(message, timeit.default_timer()-start, self._error_code))
+                    except Quality_error:
+                        self._error_code = -5
+                        logger.info("{}::{}::{}".format(message, timeit.default_timer()-start, self._error_code))
+                    except Unknown_problem:
                         self._error_code = -6
-                        logger.info("%s::%s::%s", message, timeit.default_timer()-start, self._error_code)
+                        logger.info("{}::{}::{}".format(message, timeit.default_timer()-start, self._error_code))
+                    except:
+                        self._error_code = -7
+                        logger.info("{}::{}::{}".format(message, timeit.default_timer()-start, self._error_code))
                     t += dt               
     
     def get_waveform(self, row, t, component, channels, dt, max_gap, data_percentage, sleep_time, attempts):
@@ -133,7 +149,11 @@ class Downloader(object):
             con = "{}H{}".format(channel, component)
             attempt = 1
             while attempt <= attempts:
+                quality = True
+                fdsn = True
+                waveform = inventory = None
                 try:
+                #if True:
                     waveform = self._clients[row["client"]].get_waveforms(
                         network = row["network"], 
                         station = row["station"], 
@@ -143,12 +163,6 @@ class Downloader(object):
                         endtime = t + dt, 
                         attach_response = False
                     )
-                    if (not self.waveform_quality(waveform, max_gap, data_percentage, dt)):
-                        raise Quality_error([row["network"], row["station"], t])
-
-                    waveform.merge(fill_value = "interpolate")
-                    waveform = waveform.pop()
-
                     inventory = self._clients[row["client"]].get_stations(
                         network = row["network"], 
                         station = row["station"], 
@@ -158,19 +172,28 @@ class Downloader(object):
                         endtime = t + dt, 
                         level = "response"
                     )
-
+                    if(not self.waveform_quality(waveform, max_gap, data_percentage, dt)):
+                        raise Quality_error()
+                    waveform.merge(fill_value = "interpolate")
+                    waveform = waveform.pop()
                     return waveform, inventory
-                except obspy.clients.fdsn.header.FDSNNoDataException:
-                    self._error_code = -1
+                except FDSNException:
+                    fdsn = False
                 except Quality_error:
-                    self._error_code = -5
-                except KeyboardInterrupt:
-                    self._error_code = -3
-                except:
-                    self._error_code = -2
+                    quality = False
                 attempt += 1
                 time.sleep(sleep_time)
-        return None, None
+        if(not fdsn):
+            raise FDSN_problem
+        elif(waveform is None):
+            raise Waveform_problem()
+        elif(inventory is None):
+            raise Inventory_problem()
+        elif (not quality):
+            print("quality")
+            raise Quality_error()
+        raise Unknown_problem()
+            
     
     def process_waveform(self, waveform, inventory, processing = True, normalization = False, 
                         resample = True, sampling_rate = 5, detrend_option = "linear", 

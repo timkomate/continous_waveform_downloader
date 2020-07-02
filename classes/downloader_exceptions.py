@@ -1,14 +1,17 @@
 class Quality_error(Exception):
-    def __init__(self, value):
-        #print value
-        pass
+    pass
 
-class Waveform_excist(Exception):
-    def __init__(self, value):
-        #print value
-        pass
+class FDSN_problem(Exception):
+    pass
+
+class Waveform_exist(Exception):
+    pass
 
 class Waveform_problem(Exception):
-    def __init__(self, value):
-        #print value
-        pass
+    pass
+
+class Inventory_problem(Exception):
+    pass
+
+class Unknown_problem(Exception):
+    pass
