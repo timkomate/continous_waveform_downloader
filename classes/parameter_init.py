@@ -1,4 +1,7 @@
-import configparser
+if sys.version_info[0] == 2:
+    import ConfigParser as configparser
+else:
+    import configparser
 
 config = configparser.ConfigParser()
 config.read("./config.cfg")
